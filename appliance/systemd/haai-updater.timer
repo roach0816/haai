@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Home Assistant AI appliance updates daily
+
+[Timer]
+OnCalendar=03:30
+Persistent=true
+Unit=haai-updater.service
+
+[Install]
+WantedBy=timers.target

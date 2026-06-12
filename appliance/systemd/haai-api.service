@@ -1,0 +1,25 @@
+[Unit]
+Description=Home Assistant AI appliance API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=haai
+Group=haai
+WorkingDirectory=/opt/haai
+EnvironmentFile=-/etc/haai/haai.env
+Environment=HAAI_HOST=0.0.0.0
+Environment=HAAI_PORT=8787
+Environment=HAAI_DATA_DIR=/var/lib/haai
+ExecStart=/usr/bin/node /opt/haai/dist/server/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/haai /var/log/haai
+
+[Install]
+WantedBy=multi-user.target

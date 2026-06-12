@@ -1,0 +1,13 @@
+[Unit]
+Description=Home Assistant AI appliance updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/haai/haai.env
+ExecStart=/opt/haai/appliance/scripts/haai-update check
+NoNewPrivileges=true
+PrivateTmp=true
