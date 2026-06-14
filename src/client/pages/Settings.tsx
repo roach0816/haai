@@ -58,6 +58,7 @@ export function Settings() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateApplying, setUpdateApplying] = useState(false);
   const [certificateRequesting, setCertificateRequesting] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [updateSettingsOpen, setUpdateSettingsOpen] = useState(false);
@@ -93,16 +94,27 @@ export function Settings() {
   }, []);
 
   useEffect(() => {
-    if (health?.update.status !== "applying") return;
+    if (!updateApplying && health?.update.status !== "applying") return;
     const timer = window.setInterval(() => {
       void api.health()
-        .then(setHealth)
+        .then((nextHealth) => {
+          setHealth(nextHealth);
+          if (nextHealth.update.status === "failed") {
+            setUpdateApplying(false);
+            setError(nextHealth.update.error ?? "Update failed.");
+            return;
+          }
+          if (nextHealth.update.status === "idle" && versionsMatch(nextHealth.version, nextHealth.update.currentVersion)) {
+            setUpdateApplying(false);
+            setMessage(`Updated to ${nextHealth.version}.`);
+          }
+        })
         .catch(() => {
           // The API may briefly restart during install; keep polling.
         });
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [health?.update.status]);
+  }, [health?.update.status, updateApplying]);
 
   async function saveHa(event: FormEvent) {
     event.preventDefault();
@@ -223,15 +235,16 @@ export function Settings() {
 
   async function applyUpdate() {
     setError("");
-    setUpdateChecking(true);
+    setUpdateApplying(true);
     try {
       await api.update("apply");
-      setHealth(await api.health());
-      setMessage("Update apply started. Refresh after the service restarts.");
+      await api.health().then(setHealth).catch(() => {
+        // The updater may restart the API before this immediate refresh completes.
+      });
+      setMessage("Update apply started. The app will keep checking while the service restarts.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Apply update failed");
-    } finally {
-      setUpdateChecking(false);
+      setUpdateApplying(false);
     }
   }
 
@@ -473,7 +486,7 @@ export function Settings() {
         <section className="panel">
           <div className="panel-heading">
             <h2>Updates</h2>
-            <UpdateBadge health={health} checking={updateChecking} />
+            <UpdateBadge health={health} checking={updateChecking} applying={updateApplying} />
           </div>
           <div className="version-grid">
             <div>
@@ -492,19 +505,19 @@ export function Settings() {
             <p className="muted">Last checked: never</p>
           )}
           {health?.update.error ? <p className="error">{health.update.error}</p> : null}
-          <UpdateProgress health={health} checking={updateChecking} />
+          <UpdateProgress health={health} checking={updateChecking} applying={updateApplying} />
           <ReleaseNotes health={health} />
           <div className="button-row">
-            <button type="button" onClick={checkUpdate} disabled={updateChecking}>
+            <button type="button" onClick={checkUpdate} disabled={updateChecking || updateApplying}>
               {updateChecking ? "Checking..." : "Check for updates"}
             </button>
             <button
               type="button"
               className="secondary"
               onClick={applyUpdate}
-              disabled={updateChecking || health?.update.status !== "available"}
+              disabled={updateChecking || updateApplying || health?.update.status !== "available"}
             >
-              Apply update
+              {updateApplying ? "Applying..." : "Apply update"}
             </button>
             <button type="button" className="secondary" onClick={() => setUpdateSettingsOpen(true)}>
               Update settings
@@ -540,6 +553,14 @@ function updateSettingsReady(settings: UpdateSettings): boolean {
   return Boolean(settings.manifestUrl);
 }
 
+function versionsMatch(left: string, right?: string): boolean {
+  return normalizeVersion(left) === normalizeVersion(right ?? "");
+}
+
+function normalizeVersion(version: string): string {
+  return version.trim().replace(/^v/i, "");
+}
+
 function runtimeSettingsPayload(runtime: RuntimeSettings, cloudflareToken: string) {
   return {
     httpPort: runtime.httpPort,
@@ -567,13 +588,22 @@ function formatCertStatus(status: RuntimeSettings["ssl"]["status"]): string {
   return status.replace("_", " ");
 }
 
-function UpdateBadge({ health, checking }: { health: SystemHealth | null; checking: boolean }) {
-  const state = getUpdateBadgeState(health, checking);
+function UpdateBadge({
+  health,
+  checking,
+  applying
+}: {
+  health: SystemHealth | null;
+  checking: boolean;
+  applying: boolean;
+}) {
+  const state = getUpdateBadgeState(health, checking, applying);
   return <span className={`status-badge ${state.tone}`}>{state.label}</span>;
 }
 
-function getUpdateBadgeState(health: SystemHealth | null, checking: boolean) {
+function getUpdateBadgeState(health: SystemHealth | null, checking: boolean, applying: boolean) {
   if (checking) return { label: "Checking", tone: "info" };
+  if (applying || health?.update.status === "applying") return { label: "Applying", tone: "info" };
   const update = health?.update;
   if (!update?.checkedAt) return { label: "Not checked", tone: "neutral" };
   if (update.status === "failed") return { label: "Check failed", tone: "danger" };
@@ -582,10 +612,20 @@ function getUpdateBadgeState(health: SystemHealth | null, checking: boolean) {
   return { label: "Up to date", tone: "success" };
 }
 
-function UpdateProgress({ health, checking }: { health: SystemHealth | null; checking: boolean }) {
+function UpdateProgress({
+  health,
+  checking,
+  applying
+}: {
+  health: SystemHealth | null;
+  checking: boolean;
+  applying: boolean;
+}) {
   const progress = checking
     ? { label: "Checking for updates", percent: 35 }
-    : health?.update.progress;
+    : applying && health?.update.status !== "applying"
+      ? { label: "Applying update", percent: 10 }
+      : health?.update.progress;
   if (!progress && health?.update.status !== "available") return null;
 
   const percent = progress?.percent ?? 100;

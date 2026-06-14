@@ -78,6 +78,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
       }
     } else {
       try {
+        markUpdateApplying();
         await triggerApplyUpdate();
         getDb()
           .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
@@ -117,6 +118,7 @@ function getUpdateState(): Record<string, unknown> {
     .get() as Record<string, unknown>;
   const fileRow = readUpdaterStateFile();
   if (!fileRow?.checkedAt) return dbRow;
+  if (String(dbRow.status) === "applying" && fileRow.status === "available") return dbRow;
   if (!dbRow.checked_at || String(fileRow.checkedAt) >= String(dbRow.checked_at)) {
     return {
       status: fileRow.status,
@@ -131,6 +133,24 @@ function getUpdateState(): Record<string, unknown> {
     };
   }
   return dbRow;
+}
+
+function markUpdateApplying(): void {
+  const current = getUpdateState();
+  const checkedAt = nowIso();
+  getDb()
+    .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
+    .run(checkedAt);
+  writeUpdaterStateFile({
+    status: "applying",
+    checkedAt,
+    currentVersion: String(current.current_version ?? getConfig().version),
+    availableVersion: current.available_version ? String(current.available_version) : undefined,
+    releaseUrl: current.release_url ? String(current.release_url) : undefined,
+    releaseNotes: current.release_notes ? String(current.release_notes) : undefined,
+    archiveName: current.archive_name ? String(current.archive_name) : undefined,
+    progress: { label: "Starting update", percent: 5 }
+  });
 }
 
 async function runUpdaterCheck(): Promise<UpdaterResult> {
@@ -200,4 +220,11 @@ function readUpdaterStateFile(): UpdaterResult | null {
     path.join(getConfig().dataDir, "update-check.json");
   if (!fs.existsSync(statePath)) return null;
   return JSON.parse(fs.readFileSync(statePath, "utf8")) as UpdaterResult;
+}
+
+function writeUpdaterStateFile(result: UpdaterResult): void {
+  const statePath =
+    process.env.HAAI_UPDATE_STATE_PATH ??
+    path.join(getConfig().dataDir, "update-check.json");
+  fs.writeFileSync(statePath, JSON.stringify(result, null, 2), { mode: 0o640 });
 }
