@@ -80,6 +80,10 @@ export const api = {
     request<RuntimeSettings>("/api/settings/runtime/certificate", {
       method: "POST"
     }),
+  renewCertificate: () =>
+    request<RuntimeSettings>("/api/settings/runtime/certificate/renew", {
+      method: "POST"
+    }),
   resetCertificate: () =>
     request<RuntimeSettings>("/api/settings/runtime/certificate/reset", {
       method: "POST"

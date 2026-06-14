@@ -12,7 +12,10 @@ import {
   saveRuntimeSettings,
   saveUpdateSettings
 } from "../db/repositories.js";
-import { startLetsEncryptCertificateRequest } from "../services/certificates.js";
+import {
+  startLetsEncryptCertificateRenewal,
+  startLetsEncryptCertificateRequest
+} from "../services/certificates.js";
 import { writeRuntimeConfig } from "../services/runtimeConfig.js";
 import { writeUpdaterConfig } from "../services/updateConfig.js";
 
@@ -92,6 +95,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () =>
     startLetsEncryptCertificateRequest()
+  );
+
+  app.post("/api/settings/runtime/certificate/renew", { preHandler: requireAuth }, async () =>
+    startLetsEncryptCertificateRenewal(true)
   );
 
   app.post("/api/settings/runtime/certificate/reset", { preHandler: requireAuth }, async () =>

@@ -11,6 +11,7 @@ import { sessionCookieName, requireAuth } from "../auth.js";
 import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
 import { writeRuntimeConfig } from "../services/runtimeConfig.js";
 import { clearRuntimeRestartRequired } from "../db/repositories.js";
+import { scheduleApiRestart } from "../services/apiRestart.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -105,7 +106,9 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
     writeRuntimeConfig();
     clearRuntimeRestartRequired();
-    scheduleApiRestart(app);
+    scheduleApiRestart((error) => {
+      app.log.error({ err: error }, "Failed to restart API service");
+    });
     return reply.code(202).send({ restarting: true });
   });
 }
@@ -186,28 +189,6 @@ async function triggerApplyUpdate(): Promise<void> {
   await execFileAsync("sudo", ["-n", "systemctl", "start", "haai-apply-update.service"], {
     timeout: 10_000
   });
-}
-
-async function restartApiService(): Promise<void> {
-  if (process.env.HAAI_RESTART_MODE === "disabled") return;
-  if (process.env.HAAI_RESTART_MODE === "direct") {
-    setTimeout(() => {
-      process.exit(0);
-    }, 500);
-    return;
-  }
-
-  await execFileAsync("sudo", ["-n", "systemctl", "restart", "--no-block", "haai-api.service"], {
-    timeout: 10_000
-  });
-}
-
-function scheduleApiRestart(app: FastifyInstance): void {
-  setTimeout(() => {
-    void restartApiService().catch((error) => {
-      app.log.error({ err: error }, "Failed to restart API service");
-    });
-  }, 250);
 }
 
 function formatExecError(error: unknown): string {

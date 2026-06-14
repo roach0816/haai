@@ -219,6 +219,28 @@ export function Settings() {
     }
   }
 
+  async function renewCertificate() {
+    setError("");
+    setCertificateRequesting(true);
+    let keepPolling = false;
+    try {
+      const saved = await api.renewCertificate();
+      setRuntime(saved);
+      if (saved.ssl.status === "failed") {
+        setError(saved.ssl.error ?? "Certificate renewal failed");
+      } else if (saved.ssl.status === "requesting") {
+        keepPolling = true;
+        setMessage("Certificate renewal started. The app will restart automatically if HTTPS is enabled.");
+      } else {
+        setMessage("Certificate renewal complete.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Certificate renewal failed");
+    } finally {
+      if (!keepPolling) setCertificateRequesting(false);
+    }
+  }
+
   async function resetCertificate() {
     setError("");
     try {
@@ -521,6 +543,14 @@ export function Settings() {
               disabled={!["requesting", "failed"].includes(runtime.ssl.status)}
             >
               Reset certificate status
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={renewCertificate}
+              disabled={certificateRequesting || runtime.ssl.status !== "ready"}
+            >
+              Renew certificate now
             </button>
             <button
               type="button"

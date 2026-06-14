@@ -1,8 +1,10 @@
 import { getAiSettings } from "../db/repositories.js";
 import { runAnalysis } from "./analysis.js";
+import { startLetsEncryptCertificateRenewal } from "./certificates.js";
 
 let timer: NodeJS.Timeout | undefined;
 let lastRunKey = "";
+let lastCertificateRenewalCheckKey = "";
 
 export function startScheduler(): void {
   if (timer) return;
@@ -16,6 +18,8 @@ export function stopScheduler(): void {
 }
 
 async function checkSchedule(): Promise<void> {
+  await checkCertificateRenewal();
+
   const settings = getAiSettings(false);
   if (!settings.enabled) return;
   const parsed = parseDailyCron(settings.scheduleCron);
@@ -25,6 +29,19 @@ async function checkSchedule(): Promise<void> {
   if (now.getHours() === parsed.hour && now.getMinutes() === parsed.minute && runKey !== lastRunKey) {
     lastRunKey = runKey;
     await runAnalysis("scheduled").catch((error) => console.error("Scheduled analysis failed", error));
+  }
+}
+
+async function checkCertificateRenewal(): Promise<void> {
+  const now = new Date();
+  const runKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  if (runKey === lastCertificateRenewalCheckKey) return;
+  lastCertificateRenewalCheckKey = runKey;
+
+  try {
+    startLetsEncryptCertificateRenewal(false);
+  } catch (error) {
+    console.error("Scheduled certificate renewal check failed", error);
   }
 }
 

@@ -2,7 +2,9 @@ import * as acme from "acme-client";
 import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
-import { getRuntimeSettings, saveCertificateResult } from "../db/repositories.js";
+import { clearRuntimeRestartRequired, getRuntimeSettings, saveCertificateResult } from "../db/repositories.js";
+import type { RuntimeSettings } from "../../shared/types.js";
+import { scheduleApiRestart } from "./apiRestart.js";
 import { certificateDirectory, certificatePaths, writeRuntimeConfig } from "./runtimeConfig.js";
 
 let certificateRequestRunning = false;
@@ -25,11 +27,45 @@ interface CloudflareResponse<T> {
 interface CertificateRequestSettings {
   hostname: string;
   cloudflareToken: string;
+  httpsEnabled: boolean;
+  expiresAt?: string;
 }
 
 export function startLetsEncryptCertificateRequest() {
+  return startCertificateJob({
+    autoRestart: false,
+    forceRenewal: true,
+    label: "request"
+  });
+}
+
+export function startLetsEncryptCertificateRenewal(forceRenewal = true) {
+  return startCertificateJob({
+    autoRestart: true,
+    forceRenewal,
+    label: "renewal"
+  });
+}
+
+export function shouldRenewCertificate(settings: RuntimeSettings = getRuntimeSettings(false)): boolean {
+  if (settings.ssl.status !== "ready" || !settings.ssl.expiresAt) return false;
+  const expiresAt = new Date(settings.ssl.expiresAt).getTime();
+  if (!Number.isFinite(expiresAt)) return false;
+  return expiresAt - Date.now() <= certificateRenewalWindowMs();
+}
+
+function startCertificateJob(options: {
+  autoRestart: boolean;
+  forceRenewal: boolean;
+  label: "request" | "renewal";
+}) {
   if (certificateRequestRunning) {
     throw new Error("A certificate request is already running");
+  }
+
+  if (options.label === "renewal" && !options.forceRenewal) {
+    const runtime = getRuntimeSettings(false);
+    if (!shouldRenewCertificate(runtime)) return runtime;
   }
 
   const requestSettings = certificateRequestSettings();
@@ -41,25 +77,34 @@ export function startLetsEncryptCertificateRequest() {
 
   certificateRequestRunning = true;
   setImmediate(() => {
-    void requestLetsEncryptCertificate(requestSettings).finally(() => {
-      certificateRequestRunning = false;
-    });
+    void requestLetsEncryptCertificate(requestSettings, options)
+      .finally(() => {
+        certificateRequestRunning = false;
+      });
   });
 
   return started;
 }
 
 export async function requestLetsEncryptCertificate(
-  requestSettings = certificateRequestSettings()
+  requestSettings = certificateRequestSettings(),
+  options: { autoRestart?: boolean; label?: "request" | "renewal" } = {}
 ) {
   const { hostname, cloudflareToken } = requestSettings;
   saveCertificateResult({ status: "requesting", requestedAt: new Date().toISOString(), error: undefined });
 
   try {
-    return await issueLetsEncryptCertificate(hostname, cloudflareToken);
+    const result = await issueLetsEncryptCertificate(hostname, cloudflareToken);
+    if (options.autoRestart && requestSettings.httpsEnabled) {
+      clearRuntimeRestartRequired();
+      scheduleApiRestart((error) => {
+        console.error("Failed to restart API service after certificate renewal", error);
+      });
+    }
+    return result;
   } catch (error) {
     console.error(
-      `Let's Encrypt certificate request for ${hostname} failed: ${
+      `Let's Encrypt certificate ${options.label ?? "request"} for ${hostname} failed: ${
         error instanceof Error ? error.message : "Certificate request failed"
       }`
     );
@@ -78,7 +123,7 @@ function certificateRequestSettings(): CertificateRequestSettings {
   if (settings.ssl.dnsProvider !== "cloudflare") throw new Error("Only Cloudflare DNS is supported");
   if (!cloudflareToken) throw new Error("Cloudflare token is required");
 
-  return { hostname, cloudflareToken };
+  return { hostname, cloudflareToken, httpsEnabled: settings.httpsEnabled, expiresAt: settings.ssl.expiresAt };
 }
 
 async function issueLetsEncryptCertificate(hostname: string, cloudflareToken: string) {
@@ -267,4 +312,9 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
 function certificateRequestTimeoutMs(): number {
   const seconds = Number(process.env.HAAI_CERT_REQUEST_TIMEOUT_SECONDS ?? 300);
   return Math.max(60, seconds) * 1000;
+}
+
+function certificateRenewalWindowMs(): number {
+  const days = Number(process.env.HAAI_CERT_RENEWAL_DAYS ?? 30);
+  return Math.max(1, days) * 24 * 60 * 60 * 1000;
 }
