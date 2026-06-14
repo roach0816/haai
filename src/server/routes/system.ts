@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { getConfig } from "../config.js";
 import { getDb, nowIso } from "../db/database.js";
-import { findSessionUser, hasAdminUser, latestRun } from "../db/repositories.js";
+import { findSessionUser, getRuntimeSettings, hasAdminUser, latestRun } from "../db/repositories.js";
 import { sessionCookieName, requireAuth } from "../auth.js";
 import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
 import { writeRuntimeConfig } from "../services/runtimeConfig.js";
@@ -17,6 +17,7 @@ const execFileAsync = promisify(execFile);
 export async function systemRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/system/health", async (request) => {
     const updateRow = getUpdateState();
+    const runtime = getRuntimeSettings(false);
     return {
       setupComplete: hasAdminUser(),
       authenticated: hasAdminUser()
@@ -28,6 +29,15 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         host: getConfig().host,
         port: getConfig().port,
         protocol: getConfig().protocol
+      },
+      tls: {
+        hostname: runtime.ssl.hostname,
+        httpsEnabled: runtime.httpsEnabled,
+        status: runtime.ssl.status,
+        requestedAt: runtime.ssl.requestedAt,
+        issuedAt: runtime.ssl.issuedAt,
+        expiresAt: runtime.ssl.expiresAt,
+        error: runtime.ssl.error
       },
       lastRun: latestRun(),
       update: {
@@ -94,8 +104,8 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
     writeRuntimeConfig();
-    await restartApiService();
     clearRuntimeRestartRequired();
+    scheduleApiRestart(app);
     return reply.code(202).send({ restarting: true });
   });
 }
@@ -190,6 +200,14 @@ async function restartApiService(): Promise<void> {
   await execFileAsync("sudo", ["-n", "systemctl", "restart", "--no-block", "haai-api.service"], {
     timeout: 10_000
   });
+}
+
+function scheduleApiRestart(app: FastifyInstance): void {
+  setTimeout(() => {
+    void restartApiService().catch((error) => {
+      app.log.error({ err: error }, "Failed to restart API service");
+    });
+  }, 250);
 }
 
 function formatExecError(error: unknown): string {

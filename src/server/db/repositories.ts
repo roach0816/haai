@@ -193,7 +193,9 @@ export function saveUpdateSettings(input: {
 }
 
 export function getRuntimeSettings(includeToken = false) {
-  const stored = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const stored = normalizeRuntimeSettings(
+    getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings)
+  );
   const cloudflareToken = stored.cloudflareToken ? decryptSecret(stored.cloudflareToken) : "";
   return {
     ...stored,
@@ -204,6 +206,35 @@ export function getRuntimeSettings(includeToken = false) {
       dnsTokenConfigured: Boolean(stored.cloudflareToken)
     }
   };
+}
+
+function normalizeRuntimeSettings(
+  stored: typeof defaultRuntimeSettings
+): typeof defaultRuntimeSettings {
+  if (stored.ssl.status !== "requesting" || !stored.ssl.requestedAt) return stored;
+
+  const requestedAt = new Date(stored.ssl.requestedAt).getTime();
+  if (!Number.isFinite(requestedAt)) return stored;
+
+  const staleAfterMs = certificateStaleAfterMs();
+  if (Date.now() - requestedAt < staleAfterMs) return stored;
+
+  const normalized = {
+    ...stored,
+    ssl: {
+      ...stored.ssl,
+      status: "failed" as const,
+      error:
+        "Certificate request did not complete before the service stopped or timed out. Reset certificate status and request a new certificate."
+    }
+  };
+  setSetting("runtime", normalized);
+  return normalized;
+}
+
+function certificateStaleAfterMs(): number {
+  const requestTimeoutSeconds = Number(process.env.HAAI_CERT_REQUEST_TIMEOUT_SECONDS ?? 300);
+  return Math.max(120, requestTimeoutSeconds + 60) * 1000;
 }
 
 export function saveRuntimeSettings(input: {

@@ -116,6 +116,28 @@ export function Settings() {
     return () => window.clearInterval(timer);
   }, [health?.update.status, updateApplying]);
 
+  useEffect(() => {
+    if (!certificateRequesting && runtime.ssl.status !== "requesting") return;
+    const timer = window.setInterval(() => {
+      void api.getRuntimeSettings()
+        .then((nextRuntime) => {
+          setRuntime(nextRuntime);
+          if (nextRuntime.ssl.status === "ready") {
+            setCertificateRequesting(false);
+            setMessage("Certificate request complete. Restart the service to use HTTPS.");
+          }
+          if (nextRuntime.ssl.status === "failed") {
+            setCertificateRequesting(false);
+            setError(nextRuntime.ssl.error ?? "Certificate request failed");
+          }
+        })
+        .catch(() => {
+          // Keep polling; certificate requests can overlap short service restarts.
+        });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [certificateRequesting, runtime.ssl.status]);
+
   async function saveHa(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -175,6 +197,7 @@ export function Settings() {
   async function requestCertificate() {
     setError("");
     setCertificateRequesting(true);
+    let keepPolling = false;
     try {
       const settings = await api.saveRuntimeSettings(runtimeSettingsPayload(runtime, cloudflareToken));
       setRuntime(settings);
@@ -183,13 +206,16 @@ export function Settings() {
       setRuntime(saved);
       if (saved.ssl.status === "failed") {
         setError(saved.ssl.error ?? "Certificate request failed");
+      } else if (saved.ssl.status === "requesting") {
+        keepPolling = true;
+        setMessage("Certificate request started. The app will keep checking for completion.");
       } else {
         setMessage("Certificate request complete. Restart the service to use HTTPS.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Certificate request failed");
     } finally {
-      setCertificateRequesting(false);
+      if (!keepPolling) setCertificateRequesting(false);
     }
   }
 
@@ -489,7 +515,7 @@ export function Settings() {
               type="button"
               className="secondary"
               onClick={resetCertificate}
-              disabled={certificateRequesting || !["requesting", "failed"].includes(runtime.ssl.status)}
+              disabled={!["requesting", "failed"].includes(runtime.ssl.status)}
             >
               Reset certificate status
             </button>

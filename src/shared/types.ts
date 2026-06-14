@@ -114,6 +114,15 @@ export interface SystemHealth {
     port: number;
     protocol: "http" | "https";
   };
+  tls: {
+    hostname: string;
+    httpsEnabled: boolean;
+    status: RuntimeSettings["ssl"]["status"];
+    requestedAt?: string;
+    issuedAt?: string;
+    expiresAt?: string;
+    error?: string;
+  };
   lastRun?: AnalysisRun;
   update: {
     currentVersion: string;

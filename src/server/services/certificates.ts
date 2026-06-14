@@ -5,6 +5,8 @@ import path from "node:path";
 import { getRuntimeSettings, saveCertificateResult } from "../db/repositories.js";
 import { certificateDirectory, certificatePaths, writeRuntimeConfig } from "./runtimeConfig.js";
 
+let certificateRequestRunning = false;
+
 interface CloudflareZone {
   id: string;
   name: string;
@@ -20,7 +22,55 @@ interface CloudflareResponse<T> {
   errors?: Array<{ code?: number; message?: string }>;
 }
 
-export async function requestLetsEncryptCertificate() {
+interface CertificateRequestSettings {
+  hostname: string;
+  cloudflareToken: string;
+}
+
+export function startLetsEncryptCertificateRequest() {
+  if (certificateRequestRunning) {
+    throw new Error("A certificate request is already running");
+  }
+
+  const requestSettings = certificateRequestSettings();
+  const started = saveCertificateResult({
+    status: "requesting",
+    requestedAt: new Date().toISOString(),
+    error: undefined
+  });
+
+  certificateRequestRunning = true;
+  setImmediate(() => {
+    void requestLetsEncryptCertificate(requestSettings).finally(() => {
+      certificateRequestRunning = false;
+    });
+  });
+
+  return started;
+}
+
+export async function requestLetsEncryptCertificate(
+  requestSettings = certificateRequestSettings()
+) {
+  const { hostname, cloudflareToken } = requestSettings;
+  saveCertificateResult({ status: "requesting", requestedAt: new Date().toISOString(), error: undefined });
+
+  try {
+    return await issueLetsEncryptCertificate(hostname, cloudflareToken);
+  } catch (error) {
+    console.error(
+      `Let's Encrypt certificate request for ${hostname} failed: ${
+        error instanceof Error ? error.message : "Certificate request failed"
+      }`
+    );
+    return saveCertificateResult({
+      status: "failed",
+      error: error instanceof Error ? error.message : "Certificate request failed"
+    });
+  }
+}
+
+function certificateRequestSettings(): CertificateRequestSettings {
   const settings = getRuntimeSettings(true);
   const hostname = settings.ssl.hostname.trim().toLowerCase();
   const cloudflareToken = settings.cloudflareToken?.trim() ?? "";
@@ -28,73 +78,71 @@ export async function requestLetsEncryptCertificate() {
   if (settings.ssl.dnsProvider !== "cloudflare") throw new Error("Only Cloudflare DNS is supported");
   if (!cloudflareToken) throw new Error("Cloudflare token is required");
 
-  saveCertificateResult({ status: "requesting", requestedAt: new Date().toISOString(), error: undefined });
+  return { hostname, cloudflareToken };
+}
 
-  try {
-    const certDir = certificateDirectory(hostname);
-    const paths = certificatePaths(hostname);
-    fs.mkdirSync(certDir, { recursive: true, mode: 0o750 });
+async function issueLetsEncryptCertificate(hostname: string, cloudflareToken: string) {
+  console.info(`Starting Let's Encrypt certificate request for ${hostname}`);
+  const certDir = certificateDirectory(hostname);
+  const paths = certificatePaths(hostname);
+  fs.mkdirSync(certDir, { recursive: true, mode: 0o750 });
 
-    const accountKeyPath = path.join(certDir, "account-key.pem");
-    const accountKey = fs.existsSync(accountKeyPath)
-      ? fs.readFileSync(accountKeyPath)
-      : await acme.crypto.createPrivateKey();
-    if (!fs.existsSync(accountKeyPath)) {
-      fs.writeFileSync(accountKeyPath, accountKey, { mode: 0o600 });
-    }
-
-    const [certificateKey, csr] = await acme.crypto.createCsr({
-      commonName: hostname,
-      altNames: [hostname]
-    });
-
-    const client = new acme.Client({
-      directoryUrl: acme.directory.letsencrypt.production,
-      accountKey
-    });
-
-    const createdRecords: Array<{ zoneId: string; recordId: string }> = [];
-    const certificate = await withTimeout(
-      client.auto({
-        csr,
-        termsOfServiceAgreed: true,
-        challengePriority: ["dns-01"],
-        challengeCreateFn: async (authz, _challenge, keyAuthorization) => {
-          const recordName = `_acme-challenge.${authz.identifier.value}`;
-          const recordValue = keyAuthorization;
-          const zone = await findCloudflareZone(hostname, cloudflareToken);
-          const record = await createTxtRecord(zone.id, recordName, recordValue, cloudflareToken);
-          createdRecords.push({ zoneId: zone.id, recordId: record.id });
-          await waitForDnsPropagation(recordName, recordValue);
-        },
-        challengeRemoveFn: async () => {
-          await Promise.allSettled(
-            createdRecords.map((record) =>
-              deleteTxtRecord(record.zoneId, record.recordId, cloudflareToken)
-            )
-          );
-        }
-      }),
-      certificateRequestTimeoutMs(),
-      "Certificate request timed out before Let's Encrypt completed DNS validation"
-    );
-
-    fs.writeFileSync(paths.keyPath, certificateKey, { mode: 0o600 });
-    fs.writeFileSync(paths.certPath, certificate, { mode: 0o600 });
-    writeRuntimeConfig();
-
-    const info = acme.crypto.readCertificateInfo(certificate);
-    return saveCertificateResult({
-      status: "ready",
-      issuedAt: info.notBefore.toISOString(),
-      expiresAt: info.notAfter.toISOString()
-    });
-  } catch (error) {
-    return saveCertificateResult({
-      status: "failed",
-      error: error instanceof Error ? error.message : "Certificate request failed"
-    });
+  const accountKeyPath = path.join(certDir, "account-key.pem");
+  const accountKey = fs.existsSync(accountKeyPath)
+    ? fs.readFileSync(accountKeyPath)
+    : await acme.crypto.createPrivateKey();
+  if (!fs.existsSync(accountKeyPath)) {
+    fs.writeFileSync(accountKeyPath, accountKey, { mode: 0o600 });
   }
+
+  const [certificateKey, csr] = await acme.crypto.createCsr({
+    commonName: hostname,
+    altNames: [hostname]
+  });
+
+  const client = new acme.Client({
+    directoryUrl: acme.directory.letsencrypt.production,
+    accountKey
+  });
+
+  const createdRecords: Array<{ zoneId: string; recordId: string }> = [];
+  const certificate = await withTimeout(
+    client.auto({
+      csr,
+      termsOfServiceAgreed: true,
+      challengePriority: ["dns-01"],
+      challengeCreateFn: async (authz, _challenge, keyAuthorization) => {
+        const recordName = `_acme-challenge.${authz.identifier.value}`;
+        const recordValue = keyAuthorization;
+        const zone = await findCloudflareZone(hostname, cloudflareToken);
+        console.info(`Publishing DNS TXT challenge ${recordName} in Cloudflare zone ${zone.name}`);
+        const record = await createTxtRecord(zone.id, recordName, recordValue, cloudflareToken);
+        createdRecords.push({ zoneId: zone.id, recordId: record.id });
+        await waitForDnsPropagation(recordName, recordValue);
+      },
+      challengeRemoveFn: async () => {
+        await Promise.allSettled(
+          createdRecords.map((record) =>
+            deleteTxtRecord(record.zoneId, record.recordId, cloudflareToken)
+          )
+        );
+      }
+    }),
+    certificateRequestTimeoutMs(),
+    "Certificate request timed out before Let's Encrypt completed DNS validation"
+  );
+
+  fs.writeFileSync(paths.keyPath, certificateKey, { mode: 0o600 });
+  fs.writeFileSync(paths.certPath, certificate, { mode: 0o600 });
+  writeRuntimeConfig();
+
+  const info = acme.crypto.readCertificateInfo(certificate);
+  console.info(`Let's Encrypt certificate for ${hostname} is ready`);
+  return saveCertificateResult({
+    status: "ready",
+    issuedAt: info.notBefore.toISOString(),
+    expiresAt: info.notAfter.toISOString()
+  });
 }
 
 async function findCloudflareZone(hostname: string, token: string): Promise<CloudflareZone> {
@@ -169,7 +217,10 @@ async function waitForDnsPropagation(recordName: string, expectedValue: string):
 
   while (Date.now() - startedAt < timeoutMs) {
     lastValues = await readTxtRecords(recordName);
-    if (lastValues.includes(expectedValue)) return;
+    if (lastValues.includes(expectedValue)) {
+      console.info(`DNS TXT challenge ${recordName} is visible to resolver`);
+      return;
+    }
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 
