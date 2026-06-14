@@ -156,7 +156,8 @@ function applyApplianceMetadata(currentVersion, manifest) {
       ...process.env,
       HAAI_APP_DIR: appDir,
       HAAI_DATA_DIR: dataDir,
-      HAAI_INSTALL_SKIP_SERVICE_RESTART: '1'
+      HAAI_INSTALL_SKIP_SERVICE_RESTART: '1',
+      HAAI_INSTALL_UPDATE_MODE: '1'
     }
   });
 }

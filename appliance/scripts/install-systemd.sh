@@ -6,6 +6,7 @@ DATA_DIR="${HAAI_DATA_DIR:-/var/lib/haai}"
 LOG_DIR="${HAAI_LOG_DIR:-/var/log/haai}"
 SYSTEMCTL="$(command -v systemctl)"
 SKIP_SERVICE_RESTART="${HAAI_INSTALL_SKIP_SERVICE_RESTART:-0}"
+UPDATE_MODE="${HAAI_INSTALL_UPDATE_MODE:-0}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root." >&2
@@ -86,10 +87,16 @@ fi
 "${SYSTEMCTL}" cat haai-updater.timer >/dev/null
 "${SYSTEMCTL}" cat haai-apply-update.service >/dev/null
 
-sudo -u haai sudo -n -l "${SYSTEMCTL}" start haai-apply-update.service >/dev/null
-sudo -u haai sudo -n -l "${SYSTEMCTL}" restart --no-block haai-api.service >/dev/null
+if [[ "${UPDATE_MODE}" != "1" ]]; then
+  sudo -u haai sudo -n -l "${SYSTEMCTL}" start haai-apply-update.service >/dev/null
+  sudo -u haai sudo -n -l "${SYSTEMCTL}" restart --no-block haai-api.service >/dev/null
+fi
 
 echo "Home Assistant AI systemd services installed."
 echo "API service: $("${SYSTEMCTL}" is-active haai-api.service || true)"
 echo "Updater timer: $("${SYSTEMCTL}" is-active haai-updater.timer || true)"
-echo "Apply-update and API restart permissions are installed through sudoers."
+if [[ "${UPDATE_MODE}" == "1" ]]; then
+  echo "Skipped service restart and sudo handoff verification for update mode."
+else
+  echo "Apply-update and API restart permissions are installed through sudoers."
+fi
