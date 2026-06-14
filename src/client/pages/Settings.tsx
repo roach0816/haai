@@ -151,16 +151,7 @@ export function Settings() {
     event.preventDefault();
     setError("");
     try {
-      const saved = await api.saveRuntimeSettings({
-        httpPort: runtime.httpPort,
-        httpsPort: runtime.httpsPort,
-        httpsEnabled: runtime.httpsEnabled,
-        ssl: {
-          hostname: runtime.ssl.hostname,
-          dnsProvider: runtime.ssl.dnsProvider,
-          token: cloudflareToken || undefined
-        }
-      });
+      const saved = await api.saveRuntimeSettings(runtimeSettingsPayload(runtime, cloudflareToken));
       setRuntime(saved);
       setCloudflareToken("");
       setMessage("Network and TLS settings saved. Restart the service to apply listener changes.");
@@ -173,6 +164,9 @@ export function Settings() {
     setError("");
     setCertificateRequesting(true);
     try {
+      const settings = await api.saveRuntimeSettings(runtimeSettingsPayload(runtime, cloudflareToken));
+      setRuntime(settings);
+      setCloudflareToken("");
       const saved = await api.requestCertificate();
       setRuntime(saved);
       if (saved.ssl.status === "failed") {
@@ -544,6 +538,19 @@ function updateSettingsReady(settings: UpdateSettings): boolean {
     return Boolean(settings.githubOwner && settings.githubRepo && settings.githubTokenConfigured);
   }
   return Boolean(settings.manifestUrl);
+}
+
+function runtimeSettingsPayload(runtime: RuntimeSettings, cloudflareToken: string) {
+  return {
+    httpPort: runtime.httpPort,
+    httpsPort: runtime.httpsPort,
+    httpsEnabled: runtime.httpsEnabled,
+    ssl: {
+      hostname: runtime.ssl.hostname,
+      dnsProvider: runtime.ssl.dnsProvider,
+      token: cloudflareToken || undefined
+    }
+  };
 }
 
 function TlsBadge({ runtime }: { runtime: RuntimeSettings }) {

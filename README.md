@@ -191,8 +191,22 @@ The GitHub owner, repo, and token are stored from the web UI. The token is encry
 
 The GUI Apply update button starts `haai-apply-update.service`, which runs as root through a narrow sudoers rule for the `haai` service user. The updater reads the latest GitHub Release, downloads the `haai-<version>.tgz` asset, verifies SHA-256 using GitHub's asset digest or the uploaded `.sha256` file, backs up `/opt/haai`, replaces the app files, installs production dependencies, and restarts `haai-api.service`.
 
+The updater also reapplies the appliance service metadata from the release, including systemd units, sudoers rules, and the default env-file migration. This is required for settings such as port changes, TLS on `443`, and GUI-triggered service restarts to work after an app update.
+
 If an update fails after the backup is created, the updater attempts to restore the previous app bundle. Manual rollback is also available:
 
 ```bash
 sudo /opt/haai/appliance/scripts/haai-update rollback
+```
+
+If Network & TLS settings save but the active listener does not change, check for an old explicit port override:
+
+```bash
+sudo grep HAAI_PORT /etc/haai/haai.env
+```
+
+If needed, remove or comment `HAAI_PORT=8787`, then restart from the GUI or run:
+
+```bash
+sudo systemctl restart haai-api.service
 ```

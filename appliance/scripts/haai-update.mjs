@@ -122,6 +122,7 @@ async function applyUpdate() {
     if (fs.existsSync(path.join(appDir, "package-lock.json"))) {
       run("npm", ["ci", "--omit=dev"], { cwd: appDir });
     }
+    applyApplianceMetadata(currentVersion, manifest);
     run("systemctl", ["start", serviceName]);
   } catch (error) {
     restoreBackup(backupPath);
@@ -143,6 +144,20 @@ async function applyUpdate() {
     backupPath,
     message: `Updated from ${currentVersion} to ${manifest.version}`
   };
+}
+
+function applyApplianceMetadata(currentVersion, manifest) {
+  const installer = path.join(appDir, "appliance", "scripts", "install-systemd.sh");
+  if (!fs.existsSync(installer)) return;
+  writeState(applyProgress(currentVersion, manifest, "Installing appliance services", 92));
+  run("bash", [installer], {
+    cwd: appDir,
+    env: {
+      ...process.env,
+      HAAI_APP_DIR: appDir,
+      HAAI_DATA_DIR: dataDir
+    }
+  });
 }
 
 function rollback() {
@@ -385,6 +400,7 @@ function restoreBackup(backupPath) {
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd,
+    env: options.env,
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit"
   });
   if (result.status !== 0 && !options.allowFailure) {

@@ -93,8 +93,8 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
     writeRuntimeConfig();
+    await restartApiService();
     clearRuntimeRestartRequired();
-    void restartApiService();
     return reply.code(202).send({ restarting: true });
   });
 }
@@ -167,13 +167,9 @@ async function restartApiService(): Promise<void> {
     return;
   }
 
-  setTimeout(() => {
-    void execFileAsync("sudo", ["-n", "systemctl", "restart", "haai-api.service"], {
-      timeout: 10_000
-    }).catch((error) => {
-      console.error(formatExecError(error));
-    });
-  }, 500);
+  await execFileAsync("sudo", ["-n", "systemctl", "restart", "--no-block", "haai-api.service"], {
+    timeout: 10_000
+  });
 }
 
 function formatExecError(error: unknown): string {

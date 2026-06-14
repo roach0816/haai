@@ -1,1 +1,1 @@
-haai ALL=(root) NOPASSWD: /bin/systemctl start haai-apply-update.service, /usr/bin/systemctl start haai-apply-update.service, /bin/systemctl restart haai-api.service, /usr/bin/systemctl restart haai-api.service
+haai ALL=(root) NOPASSWD: /bin/systemctl start haai-apply-update.service, /usr/bin/systemctl start haai-apply-update.service, /bin/systemctl restart --no-block haai-api.service, /usr/bin/systemctl restart --no-block haai-api.service

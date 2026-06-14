@@ -73,7 +73,7 @@ visudo -cf /etc/sudoers.d/haai-updater
 "${SYSTEMCTL}" cat haai-apply-update.service >/dev/null
 
 sudo -u haai sudo -n -l "${SYSTEMCTL}" start haai-apply-update.service >/dev/null
-sudo -u haai sudo -n -l "${SYSTEMCTL}" restart haai-api.service >/dev/null
+sudo -u haai sudo -n -l "${SYSTEMCTL}" restart --no-block haai-api.service >/dev/null
 
 echo "Home Assistant AI systemd services installed."
 echo "API service: $("${SYSTEMCTL}" is-active haai-api.service)"
