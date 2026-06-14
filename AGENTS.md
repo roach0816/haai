@@ -26,4 +26,20 @@ npm test
 npm run release:package
 ```
 
-For GitHub releases, tag the commit with the matching version prefixed by `v`, for example `v0.0.2`.
+When giving the user release commands, always include the complete GitHub release trigger sequence:
+
+```bash
+git add .
+git commit -m "<release message>"
+git push origin main
+git tag v<version>
+git push origin v<version>
+```
+
+The tag push is required because `.github/workflows/release.yml` creates the GitHub Release only on `v*` tag pushes. Do not assume pushing `main` is enough.
+
+Also tell the user to verify:
+
+- GitHub Actions has a completed Release workflow run.
+- `https://github.com/roach0816/haai/releases/tag/v<version>` exists.
+- The release includes `haai-<version>.tgz` and `haai-<version>.tgz.sha256`.
