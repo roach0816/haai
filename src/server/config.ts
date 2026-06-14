@@ -23,6 +23,17 @@ export function getConfig(): RuntimeConfig {
     dataDir,
     databasePath: process.env.HAAI_DB_PATH ?? path.join(dataDir, "haai.sqlite"),
     secretPath: process.env.HAAI_SECRET_PATH ?? path.join(dataDir, "app-secret"),
-    version: process.env.npm_package_version ?? "0.0.1"
+    version: process.env.npm_package_version ?? readPackageVersion()
   };
+}
+
+function readPackageVersion(): string {
+  try {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")
+    ) as { version?: string };
+    return packageJson.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
 }
