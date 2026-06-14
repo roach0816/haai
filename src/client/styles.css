@@ -340,6 +340,79 @@ pre {
   color: #991b1b;
 }
 
+.update-panel {
+  grid-column: 1 / -1;
+}
+
+.version-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.version-grid div {
+  border: 1px solid #e3e9f2;
+  border-radius: 8px;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.version-grid span {
+  color: #65778a;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.version-grid strong {
+  font-size: 1.25rem;
+}
+
+.update-progress {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #34495e;
+  font-weight: 800;
+}
+
+.progress-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #e8eef7;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #0b6bcb;
+  transition: width 180ms ease;
+}
+
+.release-notes {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.release-notes a {
+  color: #0b6bcb;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.notes-box {
+  background: #f8fafc;
+  color: #24384f;
+  border: 1px solid #e3e9f2;
+  max-height: 280px;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -394,6 +467,7 @@ pre {
 
   .stats-grid,
   .settings-grid,
+  .version-grid,
   .two-col {
     grid-template-columns: 1fr;
   }

@@ -99,5 +99,12 @@ export interface SystemHealth {
     checkedAt?: string;
     status: "idle" | "checking" | "available" | "applying" | "failed";
     error?: string;
+    releaseUrl?: string;
+    releaseNotes?: string;
+    archiveName?: string;
+    progress?: {
+      label: string;
+      percent: number;
+    };
   };
 }

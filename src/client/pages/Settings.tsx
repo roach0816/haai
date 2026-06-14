@@ -68,6 +68,18 @@ export function Settings() {
     };
   }, []);
 
+  useEffect(() => {
+    if (health?.update.status !== "applying") return;
+    const timer = window.setInterval(() => {
+      void api.health()
+        .then(setHealth)
+        .catch(() => {
+          // The API may briefly restart during install; keep polling.
+        });
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [health?.update.status]);
+
   async function saveHa(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -268,23 +280,40 @@ export function Settings() {
           <button>Save AI settings</button>
         </form>
 
-        <form className="panel" onSubmit={saveUpdate}>
+        <section className="panel">
           <div className="panel-heading">
             <h2>Appliance</h2>
-            <UpdateBadge health={health} checking={updateChecking} />
+            <span className="status-badge neutral">Local service</span>
           </div>
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
+          <p className="muted">The API service is managed by systemd and stores local data on this Pi.</p>
+        </section>
+
+        <form className="panel update-panel" onSubmit={saveUpdate}>
+          <div className="panel-heading">
+            <h2>Updates</h2>
+            <UpdateBadge health={health} checking={updateChecking} />
+          </div>
+          <div className="version-grid">
+            <div>
+              <span>Installed</span>
+              <strong>{health?.version ?? "unknown"}</strong>
+            </div>
+            <div>
+              <span>Latest</span>
+              <strong>{health?.update.availableVersion ?? "unknown"}</strong>
+            </div>
+          </div>
           <p>Updater: {updateChecking ? "checking" : health?.update.status ?? "idle"}</p>
           {health?.update.checkedAt ? (
             <p className="muted">Last checked: {new Date(health.update.checkedAt).toLocaleString()}</p>
           ) : (
             <p className="muted">Last checked: never</p>
           )}
-          {health?.update.availableVersion ? (
-            <p className="muted">Latest release: {health.update.availableVersion}</p>
-          ) : null}
           {health?.update.error ? <p className="error">{health.update.error}</p> : null}
+          <UpdateProgress health={health} checking={updateChecking} />
+          <ReleaseNotes health={health} />
           <label>
             Update source
             <select
@@ -384,4 +413,52 @@ function getUpdateBadgeState(health: SystemHealth | null, checking: boolean) {
   if (update.status === "available") return { label: "Update available", tone: "warning" };
   if (update.status === "applying") return { label: "Applying", tone: "info" };
   return { label: "Up to date", tone: "success" };
+}
+
+function UpdateProgress({ health, checking }: { health: SystemHealth | null; checking: boolean }) {
+  const progress = checking
+    ? { label: "Checking for updates", percent: 35 }
+    : health?.update.progress;
+  if (!progress && health?.update.status !== "available") return null;
+
+  const percent = progress?.percent ?? 100;
+  const label =
+    progress?.label ??
+    (health?.update.status === "available" ? "Update is ready to install" : "Waiting");
+
+  return (
+    <div className="update-progress">
+      <div className="progress-label">
+        <span>{label}</span>
+        <span>{percent}%</span>
+      </div>
+      <div className="progress-track" aria-label={label}>
+        <div className="progress-fill" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ReleaseNotes({ health }: { health: SystemHealth | null }) {
+  const update = health?.update;
+  if (!update?.availableVersion && !update?.releaseNotes && !update?.releaseUrl) return null;
+
+  return (
+    <section className="release-notes">
+      <div className="panel-heading">
+        <h3>Release notes</h3>
+        {update.releaseUrl ? (
+          <a href={update.releaseUrl} target="_blank" rel="noreferrer">
+            View on GitHub
+          </a>
+        ) : null}
+      </div>
+      <p className="muted">
+        {update.archiveName ? `Asset: ${update.archiveName}` : "Release asset details unavailable"}
+      </p>
+      <pre className="notes-box">
+        {update.releaseNotes?.trim() || "No release notes were provided for this release."}
+      </pre>
+    </section>
+  );
 }

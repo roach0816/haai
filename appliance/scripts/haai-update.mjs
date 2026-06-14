@@ -61,6 +61,13 @@ async function checkForUpdate() {
     currentVersion,
     availableVersion: manifest.version,
     updateAvailable,
+    releaseUrl: manifest.releaseUrl,
+    releaseNotes: manifest.releaseNotes,
+    archiveName: manifest.archiveName,
+    progress: {
+      label: updateAvailable ? "Update available" : "System is up to date",
+      percent: 100
+    },
     manifest
   };
 }
@@ -91,8 +98,13 @@ async function applyUpdate() {
   const extractDir = path.join(tempDir, "extract");
   fs.mkdirSync(extractDir);
 
+  writeState(applyProgress(currentVersion, manifest, "Downloading release", 20));
   await downloadFile(archiveDownloadUrl, archivePath, manifest.headers);
+
+  writeState(applyProgress(currentVersion, manifest, "Verifying checksum", 40));
   verifySha256(archivePath, manifest.sha256);
+
+  writeState(applyProgress(currentVersion, manifest, "Extracting release", 55));
   run("tar", ["-xzf", archivePath, "-C", extractDir]);
 
   const releaseRoot = normalizeReleaseRoot(extractDir);
@@ -100,9 +112,11 @@ async function applyUpdate() {
 
   const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "Z");
   const backupPath = path.join(backupDir, `haai-${currentVersion}-${timestamp}.tgz`);
+  writeState(applyProgress(currentVersion, manifest, "Backing up current version", 70));
   run("tar", ["-C", appDir, "-czf", backupPath, "."]);
 
   try {
+    writeState(applyProgress(currentVersion, manifest, "Installing release", 85));
     run("systemctl", ["stop", serviceName]);
     replaceDirectory(releaseRoot, appDir);
     if (fs.existsSync(path.join(appDir, "package-lock.json"))) {
@@ -122,6 +136,10 @@ async function applyUpdate() {
     currentVersion: manifest.version,
     availableVersion: manifest.version,
     updateAvailable: false,
+    releaseUrl: manifest.releaseUrl,
+    releaseNotes: manifest.releaseNotes,
+    archiveName: manifest.archiveName,
+    progress: { label: "Update complete", percent: 100 },
     backupPath,
     message: `Updated from ${currentVersion} to ${manifest.version}`
   };
@@ -196,10 +214,24 @@ async function readGitHubRelease() {
     source: "github",
     version,
     releaseUrl: release.html_url,
+    releaseNotes: String(release.body ?? "").trim(),
     archiveUrl: String(archiveAsset.url),
     archiveName: String(archiveAsset.name),
     sha256,
     headers: githubDownloadHeaders()
+  };
+}
+
+function applyProgress(currentVersion, manifest, label, percent) {
+  return {
+    status: "applying",
+    checkedAt: new Date().toISOString(),
+    currentVersion,
+    availableVersion: manifest.version,
+    releaseUrl: manifest.releaseUrl,
+    releaseNotes: manifest.releaseNotes,
+    archiveName: manifest.archiveName,
+    progress: { label, percent }
   };
 }
 

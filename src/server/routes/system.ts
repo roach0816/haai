@@ -30,7 +30,11 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
           : undefined,
         checkedAt: updateRow.checked_at ? String(updateRow.checked_at) : undefined,
         status: updateRow.status,
-        error: updateRow.error ? String(updateRow.error) : undefined
+        error: updateRow.error ? String(updateRow.error) : undefined,
+        releaseUrl: updateRow.release_url ? String(updateRow.release_url) : undefined,
+        releaseNotes: updateRow.release_notes ? String(updateRow.release_notes) : undefined,
+        archiveName: updateRow.archive_name ? String(updateRow.archive_name) : undefined,
+        progress: updateRow.progress ? JSON.parse(String(updateRow.progress)) : undefined
       }
     };
   });
@@ -81,6 +85,10 @@ interface UpdaterResult {
   currentVersion: string;
   availableVersion?: string;
   error?: string;
+  releaseUrl?: string;
+  releaseNotes?: string;
+  archiveName?: string;
+  progress?: { label: string; percent: number };
 }
 
 function getUpdateState(): Record<string, unknown> {
@@ -89,13 +97,17 @@ function getUpdateState(): Record<string, unknown> {
     .get() as Record<string, unknown>;
   const fileRow = readUpdaterStateFile();
   if (!fileRow?.checkedAt) return dbRow;
-  if (!dbRow.checked_at || String(fileRow.checkedAt) > String(dbRow.checked_at)) {
+  if (!dbRow.checked_at || String(fileRow.checkedAt) >= String(dbRow.checked_at)) {
     return {
       status: fileRow.status,
       current_version: fileRow.currentVersion,
       available_version: fileRow.availableVersion,
       checked_at: fileRow.checkedAt,
-      error: fileRow.error
+      error: fileRow.error,
+      release_url: fileRow.releaseUrl,
+      release_notes: fileRow.releaseNotes,
+      archive_name: fileRow.archiveName,
+      progress: fileRow.progress ? JSON.stringify(fileRow.progress) : undefined
     };
   }
   return dbRow;
