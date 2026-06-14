@@ -361,7 +361,24 @@ function run(command, args, options = {}) {
 }
 
 function writeState(result) {
-  fs.writeFileSync(statePath, JSON.stringify(result, null, 2), { mode: 0o640 });
+  fs.writeFileSync(statePath, JSON.stringify(redactState(result), null, 2), { mode: 0o640 });
+}
+
+function redactState(value) {
+  if (Array.isArray(value)) return value.map(redactState);
+  if (!value || typeof value !== "object") return value;
+
+  const redacted = {};
+  for (const [key, item] of Object.entries(value)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === "headers") continue;
+    if (lowerKey.includes("token") || lowerKey === "authorization") {
+      redacted[key] = "[redacted]";
+      continue;
+    }
+    redacted[key] = redactState(item);
+  }
+  return redacted;
 }
 
 function envOrConfig(envName, configName, fallback) {
