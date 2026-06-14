@@ -420,7 +420,19 @@ export function latestRun(): AnalysisRun | undefined {
 }
 
 export function saveSuggestions(runId: string, suggestions: Omit<Suggestion, "id" | "runId" | "status" | "createdAt">[]): Suggestion[] {
-  const created: Suggestion[] = suggestions.map((suggestion) => ({
+  const existingKeys = new Set(
+    (getDb().prepare("SELECT category, title FROM suggestions").all() as Array<Record<string, unknown>>)
+      .map((row) => suggestionDedupeKey(String(row.category), String(row.title)))
+  );
+  const runKeys = new Set<string>();
+  const uniqueSuggestions = suggestions.filter((suggestion) => {
+    const key = suggestionDedupeKey(suggestion.category, suggestion.title);
+    if (existingKeys.has(key) || runKeys.has(key)) return false;
+    runKeys.add(key);
+    return true;
+  });
+
+  const created: Suggestion[] = uniqueSuggestions.map((suggestion) => ({
     ...suggestion,
     id: createId("sug"),
     runId,
@@ -471,7 +483,16 @@ export function listSuggestions(filters: { category?: string; status?: string })
   const rows = getDb()
     .prepare(`SELECT * FROM suggestions ${where} ORDER BY created_at DESC`)
     .all(...params) as Array<Record<string, unknown>>;
-  return rows.map(mapSuggestion);
+  const seen = new Set<string>();
+  const suggestions: Suggestion[] = [];
+  for (const row of rows) {
+    const suggestion = mapSuggestion(row);
+    const key = suggestionDedupeKey(suggestion.category, suggestion.title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    suggestions.push(suggestion);
+  }
+  return suggestions;
 }
 
 export function updateSuggestionStatus(id: string, status: Suggestion["status"]): Suggestion | null {
@@ -512,4 +533,8 @@ function mapSuggestion(row: Record<string, unknown>): Suggestion {
     status: row.status as Suggestion["status"],
     createdAt: String(row.created_at)
   };
+}
+
+function suggestionDedupeKey(category: string, title: string): string {
+  return `${category.trim().toLowerCase()}:${title.trim().toLowerCase().replace(/\s+/g, " ")}`;
 }

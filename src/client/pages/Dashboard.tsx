@@ -8,6 +8,7 @@ export function Dashboard() {
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("new");
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,6 +31,20 @@ export function Dashboard() {
     return map;
   }, [suggestions]);
 
+  const groupedSuggestions = useMemo(() => {
+    const map = new Map<string, Suggestion[]>();
+    for (const item of suggestionCategories) map.set(item, []);
+    for (const item of suggestions) {
+      map.set(item.category, [...(map.get(item.category) ?? []), item]);
+    }
+    return map;
+  }, [suggestions]);
+
+  const selectedSuggestion = useMemo(
+    () => suggestions.find((item) => item.id === selectedSuggestionId) ?? null,
+    [selectedSuggestionId, suggestions]
+  );
+
   async function startScan() {
     setBusy(true);
     setError("");
@@ -45,6 +60,7 @@ export function Dashboard() {
 
   async function updateStatus(id: string, nextStatus: Suggestion["status"]) {
     await api.updateSuggestion(id, nextStatus);
+    if (nextStatus === "dismissed") setSelectedSuggestionId(null);
     await load();
   }
 
@@ -56,6 +72,26 @@ export function Dashboard() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (selectedSuggestion) {
+    return (
+      <main>
+        <section className="page-header">
+          <div>
+            <p className="eyebrow">{selectedSuggestion.category}</p>
+            <h1>{selectedSuggestion.title}</h1>
+            <p className="muted">Review the evidence, YAML, install steps, and rollback path before making Home Assistant changes.</p>
+          </div>
+          <button className="secondary" onClick={() => setSelectedSuggestionId(null)}>Back to dashboard</button>
+        </section>
+        <SuggestionCard
+          suggestion={selectedSuggestion}
+          onStatus={updateStatus}
+          onRegenerate={regenerate}
+        />
+      </main>
+    );
   }
 
   return (
@@ -92,15 +128,36 @@ export function Dashboard() {
         </select>
       </section>
 
-      <section className="suggestion-list">
-        {suggestions.length ? suggestions.map((suggestion) => (
-          <SuggestionCard
-            key={suggestion.id}
-            suggestion={suggestion}
-            onStatus={updateStatus}
-            onRegenerate={regenerate}
-          />
-        )) : (
+      <section className="pillar-grid">
+        {suggestions.length ? suggestionCategories.map((item) => {
+          const categorySuggestions = groupedSuggestions.get(item) ?? [];
+          return (
+            <article className="pillar" key={item}>
+              <header>
+                <div>
+                  <h2>{item}</h2>
+                  <p className="muted">{categorySuggestions.length} suggestion{categorySuggestions.length === 1 ? "" : "s"}</p>
+                </div>
+                <span className="status-badge neutral">{counts.get(item) ?? 0}</span>
+              </header>
+              <div className="pillar-list">
+                {categorySuggestions.length ? categorySuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    className={`suggestion-summary risk-${suggestion.risk}`}
+                    onClick={() => setSelectedSuggestionId(suggestion.id)}
+                  >
+                    <span>{suggestion.title}</span>
+                    <small>{suggestion.effort} effort - {suggestion.risk} risk</small>
+                  </button>
+                )) : (
+                  <p className="muted">No visible suggestions in this category.</p>
+                )}
+              </div>
+            </article>
+          );
+        }) : (
           <div className="empty">
             <h2>No suggestions yet</h2>
             <p>Configure Home Assistant and AI settings, then run the first analysis.</p>
