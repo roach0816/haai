@@ -6,14 +6,15 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const action = process.argv[2] ?? "check";
+const fileConfig = readFileConfig();
 const appDir = process.env.HAAI_APP_DIR ?? "/opt/haai";
 const dataDir = process.env.HAAI_DATA_DIR ?? "/var/lib/haai";
 const backupDir = process.env.HAAI_BACKUP_DIR ?? path.join(dataDir, "backups");
-const updateSource = process.env.HAAI_UPDATE_SOURCE ?? "github";
-const manifestUrl = process.env.HAAI_UPDATE_MANIFEST_URL ?? "";
-const githubOwner = process.env.HAAI_GITHUB_OWNER ?? "";
-const githubRepo = process.env.HAAI_GITHUB_REPO ?? "";
-const githubToken = process.env.HAAI_GITHUB_TOKEN ?? "";
+const updateSource = envOrConfig("HAAI_UPDATE_SOURCE", "source", "github");
+const manifestUrl = envOrConfig("HAAI_UPDATE_MANIFEST_URL", "manifestUrl", "");
+const githubOwner = envOrConfig("HAAI_GITHUB_OWNER", "githubOwner", "");
+const githubRepo = envOrConfig("HAAI_GITHUB_REPO", "githubRepo", "");
+const githubToken = envOrConfig("HAAI_GITHUB_TOKEN", "githubToken", "");
 const serviceName = process.env.HAAI_SERVICE_NAME ?? "haai-api.service";
 const statePath = process.env.HAAI_UPDATE_STATE_PATH ?? path.join(dataDir, "update-check.json");
 
@@ -328,4 +329,17 @@ function run(command, args, options = {}) {
 
 function writeState(result) {
   fs.writeFileSync(statePath, JSON.stringify(result, null, 2), { mode: 0o640 });
+}
+
+function envOrConfig(envName, configName, fallback) {
+  const envValue = process.env[envName];
+  if (envValue) return envValue;
+  return fileConfig[configName] ?? fallback;
+}
+
+function readFileConfig() {
+  const configPath =
+    process.env.HAAI_UPDATE_CONFIG_PATH ?? path.join(process.env.HAAI_DATA_DIR ?? "/var/lib/haai", "updater-config.json");
+  if (!fs.existsSync(configPath)) return {};
+  return JSON.parse(fs.readFileSync(configPath, "utf8"));
 }

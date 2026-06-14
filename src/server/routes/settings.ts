@@ -4,9 +4,12 @@ import { requireAuth } from "../auth.js";
 import {
   getAiSettings,
   getHomeAssistantSettings,
+  getUpdateSettings,
   saveAiSettings,
-  saveHomeAssistantSettings
+  saveHomeAssistantSettings,
+  saveUpdateSettings
 } from "../db/repositories.js";
+import { writeUpdaterConfig } from "../services/updateConfig.js";
 
 const haSchema = z.object({
   baseUrl: z.string().url(),
@@ -26,6 +29,14 @@ const aiSchema = z.object({
   enabled: z.boolean()
 });
 
+const updateSchema = z.object({
+  source: z.enum(["github", "manifest"]),
+  githubOwner: z.string().max(120).default(""),
+  githubRepo: z.string().max(120).default(""),
+  githubToken: z.string().optional(),
+  manifestUrl: z.string().max(500).default("")
+});
+
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/settings/home-assistant", { preHandler: requireAuth }, async () =>
     getHomeAssistantSettings(false)
@@ -41,5 +52,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.put("/api/settings/ai-provider", { preHandler: requireAuth }, async (request) => {
     const body = aiSchema.parse(request.body);
     return saveAiSettings(body);
+  });
+
+  app.get("/api/settings/update", { preHandler: requireAuth }, async () => getUpdateSettings(false));
+
+  app.put("/api/settings/update", { preHandler: requireAuth }, async (request) => {
+    const body = updateSchema.parse(request.body);
+    const saved = saveUpdateSettings(body);
+    writeUpdaterConfig();
+    return saved;
   });
 }

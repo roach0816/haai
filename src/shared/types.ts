@@ -29,6 +29,14 @@ export interface AiSettings {
   enabled: boolean;
 }
 
+export interface UpdateSettings {
+  source: "github" | "manifest";
+  githubOwner: string;
+  githubRepo: string;
+  githubTokenConfigured: boolean;
+  manifestUrl: string;
+}
+
 export interface HaState {
   entity_id: string;
   state: string;

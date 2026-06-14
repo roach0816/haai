@@ -8,6 +8,7 @@ import { getConfig } from "../config.js";
 import { getDb, nowIso } from "../db/database.js";
 import { findSessionUser, hasAdminUser, latestRun } from "../db/repositories.js";
 import { sessionCookieName, requireAuth } from "../auth.js";
+import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -89,18 +90,20 @@ function getUpdateState(): Record<string, unknown> {
 
 async function runUpdaterCheck(): Promise<UpdaterResult> {
   const script = updaterScriptPath();
+  writeUpdaterConfig();
   const { stdout } = await execFileAsync(script, ["check"], {
     timeout: 30_000,
-    env: process.env
+    env: updaterEnv()
   });
   return JSON.parse(stdout) as UpdaterResult;
 }
 
 async function triggerApplyUpdate(): Promise<void> {
+  writeUpdaterConfig();
   if (process.env.HAAI_UPDATE_APPLY_MODE === "direct") {
     await execFileAsync(updaterScriptPath(), ["apply"], {
       timeout: 1_000,
-      env: process.env
+      env: updaterEnv()
     });
     return;
   }
@@ -108,6 +111,13 @@ async function triggerApplyUpdate(): Promise<void> {
   await execFileAsync("sudo", ["-n", "systemctl", "start", "haai-apply-update.service"], {
     timeout: 10_000
   });
+}
+
+function updaterEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    HAAI_UPDATE_CONFIG_PATH: updaterConfigPath()
+  };
 }
 
 function updaterScriptPath(): string {

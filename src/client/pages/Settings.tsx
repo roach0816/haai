@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import type { AiSettings, HomeAssistantSettings, SystemHealth } from "../../shared/types";
+import type { AiSettings, HomeAssistantSettings, SystemHealth, UpdateSettings } from "../../shared/types";
 import { api } from "../lib/api";
 
 const providerModels = {
@@ -27,15 +27,29 @@ export function Settings() {
   });
   const [haToken, setHaToken] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [update, setUpdate] = useState<UpdateSettings>({
+    source: "github",
+    githubOwner: "",
+    githubRepo: "",
+    githubTokenConfigured: false,
+    manifestUrl: ""
+  });
+  const [githubToken, setGithubToken] = useState("");
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void Promise.all([api.getHomeAssistantSettings(), api.getAiSettings(), api.health()]).then(
-      ([haSettings, aiSettings, healthState]) => {
+    void Promise.all([
+      api.getHomeAssistantSettings(),
+      api.getAiSettings(),
+      api.getUpdateSettings(),
+      api.health()
+    ]).then(
+      ([haSettings, aiSettings, updateSettings, healthState]) => {
         setHa(haSettings);
         setAi(aiSettings);
+        setUpdate(updateSettings);
         setHealth(healthState);
       }
     );
@@ -67,6 +81,18 @@ export function Settings() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection test failed");
     }
+  }
+
+  async function saveUpdate(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    const saved = await api.saveUpdateSettings({
+      ...update,
+      githubToken: githubToken || undefined
+    });
+    setUpdate(saved);
+    setGithubToken("");
+    setMessage("Update settings saved.");
   }
 
   async function checkUpdate() {
@@ -192,16 +218,69 @@ export function Settings() {
           <button>Save AI settings</button>
         </form>
 
-        <section className="panel">
+        <form className="panel" onSubmit={saveUpdate}>
           <h2>Appliance</h2>
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
           <p>Updater: {health?.update.status ?? "idle"}</p>
+          <label>
+            Update source
+            <select
+              value={update.source}
+              onChange={(event) =>
+                setUpdate({ ...update, source: event.target.value as UpdateSettings["source"] })
+              }
+            >
+              <option value="github">Private GitHub release</option>
+              <option value="manifest">Manifest fallback</option>
+            </select>
+          </label>
+          {update.source === "github" ? (
+            <>
+              <div className="two-col">
+                <label>
+                  GitHub owner
+                  <input
+                    placeholder="your-user-or-org"
+                    value={update.githubOwner}
+                    onChange={(event) => setUpdate({ ...update, githubOwner: event.target.value })}
+                  />
+                </label>
+                <label>
+                  GitHub repo
+                  <input
+                    placeholder="haai"
+                    value={update.githubRepo}
+                    onChange={(event) => setUpdate({ ...update, githubRepo: event.target.value })}
+                  />
+                </label>
+              </div>
+              <label>
+                GitHub token {update.githubTokenConfigured ? "(configured)" : ""}
+                <input
+                  type="password"
+                  value={githubToken}
+                  onChange={(event) => setGithubToken(event.target.value)}
+                  placeholder={update.githubTokenConfigured ? "Leave blank to keep existing token" : "Paste fine-grained token"}
+                />
+              </label>
+            </>
+          ) : (
+            <label>
+              Manifest URL
+              <input
+                placeholder="http://nas.local/haai/latest.json"
+                value={update.manifestUrl}
+                onChange={(event) => setUpdate({ ...update, manifestUrl: event.target.value })}
+              />
+            </label>
+          )}
+          <button>Save update settings</button>
           <div className="button-row">
             <button type="button" onClick={checkUpdate}>Check for updates</button>
             <button type="button" className="secondary" onClick={() => api.update("apply")}>Apply update</button>
           </div>
-        </section>
+        </form>
       </div>
     </main>
   );

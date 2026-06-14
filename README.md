@@ -67,7 +67,7 @@ sudo apt update
 sudo apt install -y git curl nodejs npm
 sudo mkdir -p /opt/haai
 sudo chown "$USER":"$USER" /opt/haai
-git clone https://github.com/<OWNER>/<REPO>.git /opt/haai
+git clone https://github.com/roach0816/haai.git /opt/haai
 cd /opt/haai
 npm install
 npm run build
@@ -76,22 +76,9 @@ sudo ./appliance/scripts/install-systemd.sh
 
 When Git asks for credentials, use your GitHub username and paste the fine-grained token as the password.
 
-Configure update access:
+The installer creates `/etc/haai/haai.env` for runtime basics such as host, port, and data directory. GitHub update settings are configured in the web UI after first login, not in this file.
 
-```bash
-sudo nano /etc/haai/haai.env
-```
-
-Set:
-
-```bash
-HAAI_UPDATE_SOURCE=github
-HAAI_GITHUB_OWNER=<OWNER>
-HAAI_GITHUB_REPO=<REPO>
-HAAI_GITHUB_TOKEN=<fine-grained-token-with-contents-read>
-```
-
-Restart:
+Restart after installation:
 
 ```bash
 sudo systemctl restart haai-api.service
@@ -103,7 +90,15 @@ Then open:
 http://<pi-ip>:8787
 ```
 
-Create the local admin user, enter the Home Assistant URL/token, then configure the AI provider.
+Create the local admin user, then go to Settings and configure:
+
+- Home Assistant URL and Long-Lived Access Token.
+- AI provider, model, and API key.
+- Appliance update source:
+  - Source: `Private GitHub release`
+  - GitHub owner: `roach0816`
+  - GitHub repo: `haai`
+  - GitHub token: the fine-grained token with `Contents: Read-only`
 
 ## Home Assistant Access
 
@@ -161,6 +156,8 @@ The app checks GitHub in two ways:
 
 - Manual: Settings > Appliance > Check for updates.
 - Periodic: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
+
+The GitHub owner, repo, and token are stored from the web UI. The token is encrypted in SQLite and materialized into `/var/lib/haai/updater-config.json` for the privileged updater service.
 
 The GUI Apply update button starts `haai-apply-update.service`, which runs as root. The updater reads the latest GitHub Release, downloads the `haai-<version>.tgz` asset, verifies SHA-256 using GitHub's asset digest or the uploaded `.sha256` file, backs up `/opt/haai`, replaces the app files, installs production dependencies, and restarts `haai-api.service`.
 

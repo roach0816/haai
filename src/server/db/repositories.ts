@@ -4,7 +4,8 @@ import type {
   AnalysisRun,
   HaSnapshot,
   HomeAssistantSettings,
-  Suggestion
+  Suggestion,
+  UpdateSettings
 } from "../../shared/types.js";
 import { createId, decryptSecret, encryptSecret, hmac } from "../crypto.js";
 import { getDb, getSetting, nowIso, setSetting } from "./database.js";
@@ -25,6 +26,14 @@ const defaultAiSettings: AiSettings & { apiKey?: string } = {
   monthlyBudgetUsd: 20,
   scheduleCron: "0 3 * * *",
   enabled: true
+};
+
+const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
+  source: "github",
+  githubOwner: "",
+  githubRepo: "",
+  githubTokenConfigured: false,
+  manifestUrl: ""
 };
 
 export function hasAdminUser(): boolean {
@@ -136,6 +145,37 @@ export function saveAiSettings(input: {
   };
   setSetting("ai", stored);
   return getAiSettings(false);
+}
+
+export function getUpdateSettings(includeToken = false) {
+  const stored = getSetting<typeof defaultUpdateSettings>("update", defaultUpdateSettings);
+  const githubToken = stored.githubToken ? decryptSecret(stored.githubToken) : "";
+  return {
+    ...stored,
+    githubToken: includeToken ? githubToken : undefined,
+    githubTokenConfigured: Boolean(stored.githubToken)
+  };
+}
+
+export function saveUpdateSettings(input: {
+  source: UpdateSettings["source"];
+  githubOwner: string;
+  githubRepo: string;
+  githubToken?: string;
+  manifestUrl: string;
+}): UpdateSettings {
+  const current = getSetting<typeof defaultUpdateSettings>("update", defaultUpdateSettings);
+  const stored = {
+    ...current,
+    source: input.source,
+    githubOwner: input.githubOwner.trim(),
+    githubRepo: input.githubRepo.trim(),
+    manifestUrl: input.manifestUrl.trim(),
+    githubToken: input.githubToken ? encryptSecret(input.githubToken) : current.githubToken,
+    githubTokenConfigured: Boolean(input.githubToken || current.githubToken)
+  };
+  setSetting("update", stored);
+  return getUpdateSettings(false);
 }
 
 export function saveSnapshot(snapshot: HaSnapshot): string {

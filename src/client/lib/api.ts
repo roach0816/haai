@@ -3,7 +3,8 @@ import type {
   AnalysisRun,
   HomeAssistantSettings,
   Suggestion,
-  SystemHealth
+  SystemHealth,
+  UpdateSettings
 } from "../../shared/types";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -52,6 +53,14 @@ export const api = {
   getAiSettings: () => request<AiSettings>("/api/settings/ai-provider"),
   saveAiSettings: (body: Omit<AiSettings, "apiKeyConfigured"> & { apiKey?: string }) =>
     request<AiSettings>("/api/settings/ai-provider", {
+      method: "PUT",
+      body: JSON.stringify(body)
+    }),
+  getUpdateSettings: () => request<UpdateSettings>("/api/settings/update"),
+  saveUpdateSettings: (
+    body: Omit<UpdateSettings, "githubTokenConfigured"> & { githubToken?: string }
+  ) =>
+    request<UpdateSettings>("/api/settings/update", {
       method: "PUT",
       body: JSON.stringify(body)
     }),
