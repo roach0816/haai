@@ -31,7 +31,7 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
       <header className="mobile-topbar">
         <button
           type="button"
-          className="secondary menu-toggle"
+          className="menu-toggle"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
