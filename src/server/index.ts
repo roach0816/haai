@@ -1,10 +1,12 @@
 import { buildApp } from "./app.js";
 import { getConfig } from "./config.js";
 import { getDb } from "./db/database.js";
+import { failAbandonedCertificateRequest } from "./db/repositories.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
 
 const config = getConfig();
 getDb();
+failAbandonedCertificateRequest();
 
 const app = await buildApp();
 startScheduler();

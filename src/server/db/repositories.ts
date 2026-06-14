@@ -208,6 +208,21 @@ export function getRuntimeSettings(includeToken = false) {
   };
 }
 
+export function failAbandonedCertificateRequest(): void {
+  const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  if (current.ssl.status !== "requesting") return;
+
+  setSetting("runtime", {
+    ...current,
+    ssl: {
+      ...current.ssl,
+      status: "failed" as const,
+      error:
+        "Certificate request was interrupted because the API service stopped or restarted. Reset certificate status and request a new certificate."
+    }
+  });
+}
+
 function normalizeRuntimeSettings(
   stored: typeof defaultRuntimeSettings
 ): typeof defaultRuntimeSettings {
@@ -249,16 +264,22 @@ export function saveRuntimeSettings(input: {
 }): RuntimeSettings {
   const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
   const cloudflareToken = input.ssl.token?.trim();
+  const hostname = input.ssl.hostname.trim().toLowerCase();
+  const listenerChanged =
+    current.httpPort !== input.httpPort ||
+    current.httpsPort !== input.httpsPort ||
+    current.httpsEnabled !== input.httpsEnabled ||
+    current.ssl.hostname !== hostname;
   const stored = {
     ...current,
     httpPort: input.httpPort,
     httpsPort: input.httpsPort,
     httpsEnabled: input.httpsEnabled,
-    restartRequired: true,
+    restartRequired: Boolean(current.restartRequired || listenerChanged),
     cloudflareToken: cloudflareToken ? encryptSecret(cloudflareToken) : current.cloudflareToken,
     ssl: {
       ...current.ssl,
-      hostname: input.ssl.hostname.trim().toLowerCase(),
+      hostname,
       dnsProvider: input.ssl.dnsProvider,
       dnsTokenConfigured: Boolean(cloudflareToken || current.cloudflareToken)
     }

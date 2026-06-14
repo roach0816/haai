@@ -115,6 +115,7 @@ async function issueLetsEncryptCertificate(hostname: string, cloudflareToken: st
         const recordName = `_acme-challenge.${authz.identifier.value}`;
         const recordValue = keyAuthorization;
         const zone = await findCloudflareZone(hostname, cloudflareToken);
+        await deleteExistingTxtRecords(zone.id, recordName, cloudflareToken);
         console.info(`Publishing DNS TXT challenge ${recordName} in Cloudflare zone ${zone.name}`);
         const record = await createTxtRecord(zone.id, recordName, recordValue, cloudflareToken);
         createdRecords.push({ zoneId: zone.id, recordId: record.id });
@@ -173,6 +174,17 @@ async function createTxtRecord(
       ttl: 120
     })
   });
+}
+
+async function deleteExistingTxtRecords(zoneId: string, name: string, token: string): Promise<void> {
+  const records = await cloudflare<CloudflareRecord[]>(
+    `/zones/${zoneId}/dns_records?type=TXT&name=${encodeURIComponent(name)}`,
+    token
+  );
+  if (records.length === 0) return;
+
+  console.info(`Deleting ${records.length} stale DNS TXT challenge record(s) for ${name}`);
+  await Promise.allSettled(records.map((record) => deleteTxtRecord(zoneId, record.id, token)));
 }
 
 async function deleteTxtRecord(zoneId: string, recordId: string, token: string): Promise<void> {

@@ -501,6 +501,9 @@ export function Settings() {
           {runtime.restartRequired ? (
             <p className="muted">A service restart is required before saved listener changes take effect.</p>
           ) : null}
+          {runtime.ssl.status === "requesting" ? (
+            <p className="muted">Do not restart the service while certificate validation is running.</p>
+          ) : null}
           <div className="button-row">
             <button>Save network settings</button>
             <button
@@ -523,7 +526,7 @@ export function Settings() {
               type="button"
               className="secondary"
               onClick={restartService}
-              disabled={restarting}
+              disabled={restarting || runtime.ssl.status === "requesting"}
             >
               {restarting ? "Restarting..." : "Restart service"}
             </button>
