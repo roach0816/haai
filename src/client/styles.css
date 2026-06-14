@@ -28,6 +28,15 @@ button {
   padding: 0.75rem 1rem;
   cursor: pointer;
   font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 button:disabled {
@@ -78,6 +87,17 @@ label {
   border: 1px solid #e3e9f2;
   border-radius: 8px;
   box-shadow: 0 12px 32px rgba(20, 33, 61, 0.06);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.panel:hover,
+.suggestion:hover,
+.stat:hover {
+  border-color: #d5e1ee;
+  box-shadow: 0 14px 36px rgba(20, 33, 61, 0.08);
 }
 
 .auth-card {
@@ -137,6 +157,7 @@ nav button {
   background: transparent;
   color: #34495e;
   text-align: left;
+  position: relative;
 }
 
 nav button.active {
@@ -146,6 +167,7 @@ nav button.active {
 
 .content {
   padding: 2rem;
+  animation: page-in 180ms ease both;
 }
 
 .page-header {
@@ -340,10 +362,6 @@ pre {
   color: #991b1b;
 }
 
-.update-panel {
-  grid-column: 1 / -1;
-}
-
 .version-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -411,6 +429,88 @@ pre {
   color: #24384f;
   border: 1px solid #e3e9f2;
   max-height: 280px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.36);
+  animation: fade-in 160ms ease both;
+}
+
+.modal {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100vh - 2rem));
+  overflow: auto;
+  background: white;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.22);
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+  animation: modal-in 180ms ease both;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .two-col {

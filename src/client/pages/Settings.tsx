@@ -39,6 +39,7 @@ export function Settings() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateSettingsOpen, setUpdateSettingsOpen] = useState(false);
   const autoUpdateCheckStarted = useRef(false);
 
   useEffect(() => {
@@ -290,7 +291,7 @@ export function Settings() {
           <p className="muted">The API service is managed by systemd and stores local data on this Pi.</p>
         </section>
 
-        <form className="panel update-panel" onSubmit={saveUpdate}>
+        <section className="panel">
           <div className="panel-heading">
             <h2>Updates</h2>
             <UpdateBadge health={health} checking={updateChecking} />
@@ -314,59 +315,6 @@ export function Settings() {
           {health?.update.error ? <p className="error">{health.update.error}</p> : null}
           <UpdateProgress health={health} checking={updateChecking} />
           <ReleaseNotes health={health} />
-          <label>
-            Update source
-            <select
-              value={update.source}
-              onChange={(event) =>
-                setUpdate({ ...update, source: event.target.value as UpdateSettings["source"] })
-              }
-            >
-              <option value="github">Private GitHub release</option>
-              <option value="manifest">Manifest fallback</option>
-            </select>
-          </label>
-          {update.source === "github" ? (
-            <>
-              <div className="two-col">
-                <label>
-                  GitHub owner
-                  <input
-                    placeholder="your-user-or-org"
-                    value={update.githubOwner}
-                    onChange={(event) => setUpdate({ ...update, githubOwner: event.target.value })}
-                  />
-                </label>
-                <label>
-                  GitHub repo
-                  <input
-                    placeholder="haai"
-                    value={update.githubRepo}
-                    onChange={(event) => setUpdate({ ...update, githubRepo: event.target.value })}
-                  />
-                </label>
-              </div>
-              <label>
-                GitHub token {update.githubTokenConfigured ? "(configured)" : ""}
-                <input
-                  type="password"
-                  value={githubToken}
-                  onChange={(event) => setGithubToken(event.target.value)}
-                  placeholder={update.githubTokenConfigured ? "Leave blank to keep existing token" : "Paste fine-grained token"}
-                />
-              </label>
-            </>
-          ) : (
-            <label>
-              Manifest URL
-              <input
-                placeholder="http://nas.local/haai/latest.json"
-                value={update.manifestUrl}
-                onChange={(event) => setUpdate({ ...update, manifestUrl: event.target.value })}
-              />
-            </label>
-          )}
-          <button>Save update settings</button>
           <div className="button-row">
             <button type="button" onClick={checkUpdate} disabled={updateChecking}>
               {updateChecking ? "Checking..." : "Check for updates"}
@@ -379,9 +327,22 @@ export function Settings() {
             >
               Apply update
             </button>
+            <button type="button" className="secondary" onClick={() => setUpdateSettingsOpen(true)}>
+              Update settings
+            </button>
           </div>
-        </form>
+        </section>
       </div>
+      {updateSettingsOpen ? (
+        <UpdateSettingsModal
+          update={update}
+          githubToken={githubToken}
+          setUpdate={setUpdate}
+          setGithubToken={setGithubToken}
+          onClose={() => setUpdateSettingsOpen(false)}
+          onSave={saveUpdate}
+        />
+      ) : null}
     </main>
   );
 }
@@ -460,5 +421,107 @@ function ReleaseNotes({ health }: { health: SystemHealth | null }) {
         {update.releaseNotes?.trim() || "No release notes were provided for this release."}
       </pre>
     </section>
+  );
+}
+
+function UpdateSettingsModal({
+  update,
+  githubToken,
+  setUpdate,
+  setGithubToken,
+  onClose,
+  onSave
+}: {
+  update: UpdateSettings;
+  githubToken: string;
+  setUpdate: (settings: UpdateSettings) => void;
+  setGithubToken: (token: string) => void;
+  onClose: () => void;
+  onSave: (event: FormEvent) => Promise<void>;
+}) {
+  async function submit(event: FormEvent) {
+    await onSave(event);
+    onClose();
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <form
+        className="modal"
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-settings-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Updates</p>
+            <h2 id="update-settings-title">Update settings</h2>
+          </div>
+          <button type="button" className="ghost icon-button" onClick={onClose} aria-label="Close update settings">
+            x
+          </button>
+        </div>
+        <label>
+          Update source
+          <select
+            value={update.source}
+            onChange={(event) =>
+              setUpdate({ ...update, source: event.target.value as UpdateSettings["source"] })
+            }
+          >
+            <option value="github">Private GitHub release</option>
+            <option value="manifest">Manifest fallback</option>
+          </select>
+        </label>
+        {update.source === "github" ? (
+          <>
+            <div className="two-col">
+              <label>
+                GitHub owner
+                <input
+                  placeholder="roach0816"
+                  value={update.githubOwner}
+                  onChange={(event) => setUpdate({ ...update, githubOwner: event.target.value })}
+                />
+              </label>
+              <label>
+                GitHub repo
+                <input
+                  placeholder="haai"
+                  value={update.githubRepo}
+                  onChange={(event) => setUpdate({ ...update, githubRepo: event.target.value })}
+                />
+              </label>
+            </div>
+            <label>
+              GitHub token {update.githubTokenConfigured ? "(configured)" : ""}
+              <input
+                type="password"
+                value={githubToken}
+                onChange={(event) => setGithubToken(event.target.value)}
+                placeholder={update.githubTokenConfigured ? "Leave blank to keep existing token" : "Paste fine-grained token"}
+              />
+            </label>
+          </>
+        ) : (
+          <label>
+            Manifest URL
+            <input
+              placeholder="http://nas.local/haai/latest.json"
+              value={update.manifestUrl}
+              onChange={(event) => setUpdate({ ...update, manifestUrl: event.target.value })}
+            />
+          </label>
+        )}
+        <footer className="modal-actions">
+          <button type="button" className="ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button>Save settings</button>
+        </footer>
+      </form>
+    </div>
   );
 }

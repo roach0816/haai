@@ -28,7 +28,7 @@ export function Layout({ page, setPage, onLogout, children }: Props) {
         </nav>
         <button className="ghost" onClick={onLogout}>Sign out</button>
       </aside>
-      <section className="content">{children}</section>
+      <section key={page} className="content">{children}</section>
     </div>
   );
 }
