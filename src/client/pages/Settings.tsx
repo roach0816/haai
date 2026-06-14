@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { AiSettings, HomeAssistantSettings, SystemHealth, UpdateSettings } from "../../shared/types";
 import { api } from "../lib/api";
 
@@ -38,8 +38,12 @@ export function Settings() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const autoUpdateCheckStarted = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     void Promise.all([
       api.getHomeAssistantSettings(),
       api.getAiSettings(),
@@ -47,12 +51,21 @@ export function Settings() {
       api.health()
     ]).then(
       ([haSettings, aiSettings, updateSettings, healthState]) => {
+        if (cancelled) return;
         setHa(haSettings);
         setAi(aiSettings);
         setUpdate(updateSettings);
         setHealth(healthState);
+        if (!autoUpdateCheckStarted.current && updateSettingsReady(updateSettings)) {
+          autoUpdateCheckStarted.current = true;
+          void runUpdateCheck({ showMessage: false });
+        }
       }
     );
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function saveHa(event: FormEvent) {
@@ -93,21 +106,47 @@ export function Settings() {
     setUpdate(saved);
     setGithubToken("");
     setMessage("Update settings saved.");
+    if (updateSettingsReady(saved)) {
+      await runUpdateCheck({ showMessage: true });
+    }
   }
 
   async function checkUpdate() {
+    await runUpdateCheck({ showMessage: true });
+  }
+
+  async function runUpdateCheck(options: { showMessage: boolean }) {
     setError("");
+    setUpdateChecking(true);
     try {
       await api.update("check");
       const nextHealth = await api.health();
       setHealth(nextHealth);
-      setMessage(
-        nextHealth.update.status === "failed"
-          ? "Update check failed. See the updater message below."
-          : "Update check complete."
-      );
+      if (options.showMessage) {
+        setMessage(
+          nextHealth.update.status === "failed"
+            ? "Update check failed. See the updater message below."
+            : "Update check complete."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update check failed");
+    } finally {
+      setUpdateChecking(false);
+    }
+  }
+
+  async function applyUpdate() {
+    setError("");
+    setUpdateChecking(true);
+    try {
+      await api.update("apply");
+      setHealth(await api.health());
+      setMessage("Update apply started. Refresh after the service restarts.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Apply update failed");
+    } finally {
+      setUpdateChecking(false);
     }
   }
 
@@ -230,10 +269,21 @@ export function Settings() {
         </form>
 
         <form className="panel" onSubmit={saveUpdate}>
-          <h2>Appliance</h2>
+          <div className="panel-heading">
+            <h2>Appliance</h2>
+            <UpdateBadge health={health} checking={updateChecking} />
+          </div>
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
-          <p>Updater: {health?.update.status ?? "idle"}</p>
+          <p>Updater: {updateChecking ? "checking" : health?.update.status ?? "idle"}</p>
+          {health?.update.checkedAt ? (
+            <p className="muted">Last checked: {new Date(health.update.checkedAt).toLocaleString()}</p>
+          ) : (
+            <p className="muted">Last checked: never</p>
+          )}
+          {health?.update.availableVersion ? (
+            <p className="muted">Latest release: {health.update.availableVersion}</p>
+          ) : null}
           {health?.update.error ? <p className="error">{health.update.error}</p> : null}
           <label>
             Update source
@@ -289,8 +339,17 @@ export function Settings() {
           )}
           <button>Save update settings</button>
           <div className="button-row">
-            <button type="button" onClick={checkUpdate}>Check for updates</button>
-            <button type="button" className="secondary" onClick={() => api.update("apply")}>Apply update</button>
+            <button type="button" onClick={checkUpdate} disabled={updateChecking}>
+              {updateChecking ? "Checking..." : "Check for updates"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={applyUpdate}
+              disabled={updateChecking || health?.update.status !== "available"}
+            >
+              Apply update
+            </button>
           </div>
         </form>
       </div>
@@ -303,4 +362,26 @@ function splitList(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function updateSettingsReady(settings: UpdateSettings): boolean {
+  if (settings.source === "github") {
+    return Boolean(settings.githubOwner && settings.githubRepo && settings.githubTokenConfigured);
+  }
+  return Boolean(settings.manifestUrl);
+}
+
+function UpdateBadge({ health, checking }: { health: SystemHealth | null; checking: boolean }) {
+  const state = getUpdateBadgeState(health, checking);
+  return <span className={`status-badge ${state.tone}`}>{state.label}</span>;
+}
+
+function getUpdateBadgeState(health: SystemHealth | null, checking: boolean) {
+  if (checking) return { label: "Checking", tone: "info" };
+  const update = health?.update;
+  if (!update?.checkedAt) return { label: "Not checked", tone: "neutral" };
+  if (update.status === "failed") return { label: "Check failed", tone: "danger" };
+  if (update.status === "available") return { label: "Update available", tone: "warning" };
+  if (update.status === "applying") return { label: "Applying", tone: "info" };
+  return { label: "Up to date", tone: "success" };
 }
