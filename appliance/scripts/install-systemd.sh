@@ -5,6 +5,7 @@ APP_DIR="${HAAI_APP_DIR:-/opt/haai}"
 DATA_DIR="${HAAI_DATA_DIR:-/var/lib/haai}"
 LOG_DIR="${HAAI_LOG_DIR:-/var/log/haai}"
 SYSTEMCTL="$(command -v systemctl)"
+SKIP_SERVICE_RESTART="${HAAI_INSTALL_SKIP_SERVICE_RESTART:-0}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root." >&2
@@ -75,7 +76,9 @@ visudo -cf /etc/sudoers.d/haai-updater
 "${SYSTEMCTL}" daemon-reload
 "${SYSTEMCTL}" enable haai-api.service
 "${SYSTEMCTL}" enable haai-updater.timer
-"${SYSTEMCTL}" restart haai-api.service
+if [[ "${SKIP_SERVICE_RESTART}" != "1" ]]; then
+  "${SYSTEMCTL}" restart haai-api.service
+fi
 "${SYSTEMCTL}" start haai-updater.timer
 
 "${SYSTEMCTL}" cat haai-api.service >/dev/null
@@ -87,6 +90,6 @@ sudo -u haai sudo -n -l "${SYSTEMCTL}" start haai-apply-update.service >/dev/nul
 sudo -u haai sudo -n -l "${SYSTEMCTL}" restart --no-block haai-api.service >/dev/null
 
 echo "Home Assistant AI systemd services installed."
-echo "API service: $("${SYSTEMCTL}" is-active haai-api.service)"
-echo "Updater timer: $("${SYSTEMCTL}" is-active haai-updater.timer)"
+echo "API service: $("${SYSTEMCTL}" is-active haai-api.service || true)"
+echo "Updater timer: $("${SYSTEMCTL}" is-active haai-updater.timer || true)"
 echo "Apply-update and API restart permissions are installed through sudoers."
