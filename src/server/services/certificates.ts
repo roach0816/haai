@@ -17,15 +17,16 @@ interface CloudflareRecord {
 interface CloudflareResponse<T> {
   success: boolean;
   result: T;
-  errors?: Array<{ message?: string }>;
+  errors?: Array<{ code?: number; message?: string }>;
 }
 
 export async function requestLetsEncryptCertificate() {
   const settings = getRuntimeSettings(true);
   const hostname = settings.ssl.hostname.trim().toLowerCase();
+  const cloudflareToken = settings.cloudflareToken?.trim() ?? "";
   if (!hostname) throw new Error("SSL hostname is required");
   if (settings.ssl.dnsProvider !== "cloudflare") throw new Error("Only Cloudflare DNS is supported");
-  if (!settings.cloudflareToken) throw new Error("Cloudflare token is required");
+  if (!cloudflareToken) throw new Error("Cloudflare token is required");
 
   saveCertificateResult({ status: "requesting" });
 
@@ -60,15 +61,15 @@ export async function requestLetsEncryptCertificate() {
       challengeCreateFn: async (authz, _challenge, keyAuthorization) => {
         const recordName = `_acme-challenge.${authz.identifier.value}`;
         const recordValue = dnsChallengeValue(keyAuthorization);
-        const zone = await findCloudflareZone(hostname, settings.cloudflareToken ?? "");
-        const record = await createTxtRecord(zone.id, recordName, recordValue, settings.cloudflareToken ?? "");
+        const zone = await findCloudflareZone(hostname, cloudflareToken);
+        const record = await createTxtRecord(zone.id, recordName, recordValue, cloudflareToken);
         createdRecords.push({ zoneId: zone.id, recordId: record.id });
         await waitForDnsPropagation();
       },
       challengeRemoveFn: async () => {
         await Promise.allSettled(
           createdRecords.map((record) =>
-            deleteTxtRecord(record.zoneId, record.recordId, settings.cloudflareToken ?? "")
+            deleteTxtRecord(record.zoneId, record.recordId, cloudflareToken)
           )
         );
       }
@@ -141,8 +142,17 @@ async function cloudflare<T>(
   });
   const body = (await response.json().catch(() => ({}))) as Partial<CloudflareResponse<T>>;
   if (!response.ok || !body.success) {
-    const detail = body.errors?.map((item) => item.message).filter(Boolean).join("; ");
-    throw new Error(detail || `Cloudflare request failed with HTTP ${response.status}`);
+    const detail = body.errors
+      ?.map((item) => [item.code ? `code ${item.code}` : "", item.message].filter(Boolean).join(": "))
+      .filter(Boolean)
+      .join("; ");
+    const hint =
+      response.status === 401 || response.status === 403
+        ? " Check that the Cloudflare API token is current and has Zone:Read plus DNS:Edit for the hostname's zone."
+        : "";
+    throw new Error(
+      `Cloudflare request failed with HTTP ${response.status}${detail ? ` (${detail})` : ""}.${hint}`
+    );
   }
   return body.result as T;
 }

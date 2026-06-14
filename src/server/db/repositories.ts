@@ -217,18 +217,19 @@ export function saveRuntimeSettings(input: {
   };
 }): RuntimeSettings {
   const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const cloudflareToken = input.ssl.token?.trim();
   const stored = {
     ...current,
     httpPort: input.httpPort,
     httpsPort: input.httpsPort,
     httpsEnabled: input.httpsEnabled,
     restartRequired: true,
-    cloudflareToken: input.ssl.token ? encryptSecret(input.ssl.token) : current.cloudflareToken,
+    cloudflareToken: cloudflareToken ? encryptSecret(cloudflareToken) : current.cloudflareToken,
     ssl: {
       ...current.ssl,
       hostname: input.ssl.hostname.trim().toLowerCase(),
       dnsProvider: input.ssl.dnsProvider,
-      dnsTokenConfigured: Boolean(input.ssl.token || current.cloudflareToken)
+      dnsTokenConfigured: Boolean(cloudflareToken || current.cloudflareToken)
     }
   };
   setSetting("runtime", stored);
