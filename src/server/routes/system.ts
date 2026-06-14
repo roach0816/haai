@@ -70,10 +70,16 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
           );
       }
     } else {
-      await triggerApplyUpdate();
-      getDb()
-        .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
-        .run(nowIso());
+      try {
+        await triggerApplyUpdate();
+        getDb()
+          .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
+          .run(nowIso());
+      } catch (error) {
+        getDb()
+          .prepare("UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1")
+          .run(nowIso(), formatExecError(error));
+      }
     }
     return getUpdateState();
   });
@@ -136,6 +142,14 @@ async function triggerApplyUpdate(): Promise<void> {
   await execFileAsync("sudo", ["-n", "systemctl", "start", "haai-apply-update.service"], {
     timeout: 10_000
   });
+}
+
+function formatExecError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const execError = error as { message?: string; stderr?: string; stdout?: string };
+    return [execError.message, execError.stderr, execError.stdout].filter(Boolean).join("\n");
+  }
+  return error instanceof Error ? error.message : "Update apply failed";
 }
 
 function updaterEnv(): NodeJS.ProcessEnv {

@@ -76,13 +76,15 @@ sudo ./appliance/scripts/install-systemd.sh
 
 When Git asks for credentials, use your GitHub username and paste the fine-grained token as the password.
 
-The installer creates `/etc/haai/haai.env` for runtime basics such as host, port, and data directory. GitHub update settings are configured in the web UI after first login, not in this file.
+The installer creates `/etc/haai/haai.env` for runtime basics such as host, port, and data directory. It also installs and verifies:
 
-Restart after installation:
+- `haai-api.service`
+- `haai-updater.service`
+- `haai-updater.timer`
+- `haai-apply-update.service`
+- `/etc/sudoers.d/haai-updater`
 
-```bash
-sudo systemctl restart haai-api.service
-```
+GitHub update settings are configured in the web UI after first login, not in the env file.
 
 Then open:
 
@@ -154,12 +156,12 @@ The workflow will:
 
 The app checks GitHub in two ways:
 
-- Manual: Settings > Appliance > Check for updates.
+- Manual: Settings > Updates > Check for updates.
 - Periodic: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
 
 The GitHub owner, repo, and token are stored from the web UI. The token is encrypted in SQLite and materialized into `/var/lib/haai/updater-config.json` for the privileged updater service.
 
-The GUI Apply update button starts `haai-apply-update.service`, which runs as root. The updater reads the latest GitHub Release, downloads the `haai-<version>.tgz` asset, verifies SHA-256 using GitHub's asset digest or the uploaded `.sha256` file, backs up `/opt/haai`, replaces the app files, installs production dependencies, and restarts `haai-api.service`.
+The GUI Apply update button starts `haai-apply-update.service`, which runs as root through a narrow sudoers rule for the `haai` service user. The updater reads the latest GitHub Release, downloads the `haai-<version>.tgz` asset, verifies SHA-256 using GitHub's asset digest or the uploaded `.sha256` file, backs up `/opt/haai`, replaces the app files, installs production dependencies, and restarts `haai-api.service`.
 
 If an update fails after the backup is created, the updater attempts to restore the previous app bundle. Manual rollback is also available:
 

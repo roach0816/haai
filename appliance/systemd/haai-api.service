@@ -15,7 +15,9 @@ Environment=HAAI_DATA_DIR=/var/lib/haai
 ExecStart=/usr/bin/node /opt/haai/dist/server/index.js
 Restart=always
 RestartSec=5
-NoNewPrivileges=true
+# The API can only start the root updater through the narrow sudoers rule in
+# /etc/sudoers.d/haai-updater. NoNewPrivileges would block that sudo handoff.
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
