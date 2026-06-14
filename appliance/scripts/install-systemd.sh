@@ -47,6 +47,8 @@ install -d -o root -g root -m 0755 "${APP_DIR}/appliance/scripts"
 
 if [[ ! -f /etc/haai/haai.env ]]; then
   install -o root -g haai -m 0640 appliance/haai.env.example /etc/haai/haai.env
+elif grep -qx "HAAI_PORT=8787" /etc/haai/haai.env; then
+  sed -i "s/^HAAI_PORT=8787/# HAAI_PORT=8787/" /etc/haai/haai.env
 fi
 
 install -o root -g root -m 0644 appliance/systemd/haai-api.service /etc/systemd/system/haai-api.service
@@ -71,8 +73,9 @@ visudo -cf /etc/sudoers.d/haai-updater
 "${SYSTEMCTL}" cat haai-apply-update.service >/dev/null
 
 sudo -u haai sudo -n -l "${SYSTEMCTL}" start haai-apply-update.service >/dev/null
+sudo -u haai sudo -n -l "${SYSTEMCTL}" restart haai-api.service >/dev/null
 
 echo "Home Assistant AI systemd services installed."
 echo "API service: $("${SYSTEMCTL}" is-active haai-api.service)"
 echo "Updater timer: $("${SYSTEMCTL}" is-active haai-updater.timer)"
-echo "Apply-update service is installed and allowed through sudoers."
+echo "Apply-update and API restart permissions are installed through sudoers."

@@ -4,11 +4,15 @@ import { requireAuth } from "../auth.js";
 import {
   getAiSettings,
   getHomeAssistantSettings,
+  getRuntimeSettings,
   getUpdateSettings,
   saveAiSettings,
   saveHomeAssistantSettings,
+  saveRuntimeSettings,
   saveUpdateSettings
 } from "../db/repositories.js";
+import { requestLetsEncryptCertificate } from "../services/certificates.js";
+import { writeRuntimeConfig } from "../services/runtimeConfig.js";
 import { writeUpdaterConfig } from "../services/updateConfig.js";
 
 const haSchema = z.object({
@@ -37,6 +41,17 @@ const updateSchema = z.object({
   manifestUrl: z.string().max(500).default("")
 });
 
+const runtimeSchema = z.object({
+  httpPort: z.number().int().min(1).max(65535),
+  httpsPort: z.number().int().min(1).max(65535),
+  httpsEnabled: z.boolean(),
+  ssl: z.object({
+    hostname: z.string().max(253).default(""),
+    dnsProvider: z.enum(["cloudflare"]).default("cloudflare"),
+    token: z.string().optional()
+  })
+});
+
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/settings/home-assistant", { preHandler: requireAuth }, async () =>
     getHomeAssistantSettings(false)
@@ -62,4 +77,19 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     writeUpdaterConfig();
     return saved;
   });
+
+  app.get("/api/settings/runtime", { preHandler: requireAuth }, async () =>
+    getRuntimeSettings(false)
+  );
+
+  app.put("/api/settings/runtime", { preHandler: requireAuth }, async (request) => {
+    const body = runtimeSchema.parse(request.body);
+    const saved = saveRuntimeSettings(body);
+    writeRuntimeConfig();
+    return saved;
+  });
+
+  app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () =>
+    requestLetsEncryptCertificate()
+  );
 }

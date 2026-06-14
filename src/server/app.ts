@@ -1,8 +1,11 @@
 import cookie from "@fastify/cookie";
-import fastify from "fastify";
+import fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
+import fs from "node:fs";
+import type { Server as HttpsServer } from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getConfig } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { homeAssistantRoutes } from "./routes/homeAssistant.js";
@@ -10,7 +13,16 @@ import { analysisRoutes } from "./routes/analysis.js";
 import { systemRoutes } from "./routes/system.js";
 
 export async function buildApp() {
-  const app = fastify({ logger: true });
+  const config = getConfig();
+  const app = (config.httpsEnabled
+    ? fastify<HttpsServer>({
+        logger: true,
+        https: {
+          cert: fs.readFileSync(config.certPath),
+          key: fs.readFileSync(config.keyPath)
+        }
+      })
+    : fastify({ logger: true })) as FastifyInstance;
   await app.register(cookie);
   await app.register(authRoutes);
   await app.register(settingsRoutes);

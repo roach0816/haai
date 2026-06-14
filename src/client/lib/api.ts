@@ -2,6 +2,7 @@ import type {
   AiSettings,
   AnalysisRun,
   HomeAssistantSettings,
+  RuntimeSettings,
   Suggestion,
   SystemHealth,
   UpdateSettings
@@ -64,6 +65,21 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body)
     }),
+  getRuntimeSettings: () => request<RuntimeSettings>("/api/settings/runtime"),
+  saveRuntimeSettings: (
+    body: Omit<RuntimeSettings, "restartRequired" | "ssl"> & {
+      ssl: Pick<RuntimeSettings["ssl"], "hostname" | "dnsProvider"> & { token?: string };
+    }
+  ) =>
+    request<RuntimeSettings>("/api/settings/runtime", {
+      method: "PUT",
+      body: JSON.stringify(body)
+    }),
+  requestCertificate: () =>
+    request<RuntimeSettings>("/api/settings/runtime/certificate", {
+      method: "POST"
+    }),
+  restartService: () => request<{ restarting: boolean }>("/api/system/restart", { method: "POST" }),
   startAnalysis: () =>
     request<{ runId: string }>("/api/analysis-runs", {
       method: "POST"

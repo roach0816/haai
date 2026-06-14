@@ -38,6 +38,8 @@ git push origin v<version>
 
 The tag push is required because `.github/workflows/release.yml` creates the GitHub Release only on `v*` tag pushes. Do not assume pushing `main` is enough.
 
+Use a commit message that should appear in the app's Updates card release notes. The release workflow copies the tagged commit message into the GitHub Release body, and the app displays that body as release notes.
+
 Also tell the user to verify:
 
 - GitHub Actions has a completed Release workflow run.

@@ -8,6 +8,7 @@ Home Assistant AI is a read-only advisor for a Home Assistant instance. It runs 
 - Fastify API with local username/password login.
 - SQLite persistence with local history for snapshots, analysis runs, and suggestions.
 - Encrypted storage for Home Assistant tokens and AI provider keys.
+- Runtime port settings and Let's Encrypt DNS-01 certificate requests through Cloudflare.
 - Home Assistant REST/WebSocket connection test and REST snapshot collection.
 - AI provider adapters for OpenAI, Anthropic, and Gemini.
 - Heuristic fallback suggestions when no AI key is configured or a provider call fails.
@@ -21,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Open the UI at `http://localhost:5173`. The API listens on `http://localhost:8787`.
+Open the UI at `http://localhost:5173`. The API listens on `http://localhost:8787` by default.
 
 For local data:
 
@@ -76,7 +77,7 @@ sudo ./appliance/scripts/install-systemd.sh
 
 When Git asks for credentials, use your GitHub username and paste the fine-grained token as the password.
 
-The installer creates `/etc/haai/haai.env` for runtime basics such as host, port, and data directory. It also installs and verifies:
+The installer creates `/etc/haai/haai.env` for bootstrap runtime basics such as host and data directory. Ports are controlled from the web UI unless `HAAI_PORT` is explicitly set in that file. It also installs and verifies:
 
 - `haai-api.service`
 - `haai-updater.service`
@@ -96,11 +97,38 @@ Create the local admin user, then go to Settings and configure:
 
 - Home Assistant URL and Long-Lived Access Token.
 - AI provider, model, and API key.
+- Network & TLS:
+  - HTTP port: default `8787`.
+  - HTTPS port: default `443`.
+  - SSL hostname.
+  - DNS provider: `Cloudflare`.
+  - Cloudflare token for Let's Encrypt DNS validation.
 - Appliance update source:
   - Source: `Private GitHub release`
   - GitHub owner: `roach0816`
   - GitHub repo: `haai`
   - GitHub token: the fine-grained token with `Contents: Read-only`
+
+## Ports and TLS
+
+The app defaults to port `8787` because ports below `1024` usually require extra Linux privileges. The systemd service grants only `CAP_NET_BIND_SERVICE`, which allows the non-root `haai` user to bind ports such as `80` and `443` without running the app as root.
+
+To use standard web ports on the Pi:
+
+1. Go to Settings > Network & TLS.
+2. Set HTTP port to `80` and HTTPS port to `443`.
+3. Save settings.
+4. Request a certificate if HTTPS will be enabled.
+5. Click Restart service.
+
+For containers, you can either leave the app on `8787` internally and map host ports externally, or set the internal ports in the UI. An explicit `HAAI_PORT` environment variable overrides the UI runtime config and is mainly intended for bootstrap or container deployments.
+
+Let's Encrypt support uses DNS-01 validation with Cloudflare. Create a Cloudflare API token scoped as narrowly as possible:
+
+- Permissions: `Zone:Read` and `DNS:Edit`.
+- Zone resources: only the DNS zone for the hostname you will use.
+
+The app creates a temporary TXT record at `_acme-challenge.<hostname>`, waits for DNS propagation, requests the certificate, and then removes the TXT record. The Cloudflare token is encrypted in SQLite and is not returned to the browser after saving.
 
 ## Home Assistant Access
 

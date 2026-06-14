@@ -37,6 +37,22 @@ export interface UpdateSettings {
   manifestUrl: string;
 }
 
+export interface RuntimeSettings {
+  httpPort: number;
+  httpsPort: number;
+  httpsEnabled: boolean;
+  restartRequired: boolean;
+  ssl: {
+    hostname: string;
+    dnsProvider: "cloudflare";
+    dnsTokenConfigured: boolean;
+    status: "not_configured" | "ready" | "requesting" | "failed";
+    issuedAt?: string;
+    expiresAt?: string;
+    error?: string;
+  };
+}
+
 export interface HaState {
   entity_id: string;
   state: string;
@@ -92,6 +108,11 @@ export interface SystemHealth {
   authenticated: boolean;
   version: string;
   databasePath: string;
+  network: {
+    host: string;
+    port: number;
+    protocol: "http" | "https";
+  };
   lastRun?: AnalysisRun;
   update: {
     currentVersion: string;

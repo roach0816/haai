@@ -4,6 +4,7 @@ import type {
   AnalysisRun,
   HaSnapshot,
   HomeAssistantSettings,
+  RuntimeSettings,
   Suggestion,
   UpdateSettings
 } from "../../shared/types.js";
@@ -34,6 +35,19 @@ const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
   githubRepo: "",
   githubTokenConfigured: false,
   manifestUrl: ""
+};
+
+const defaultRuntimeSettings: RuntimeSettings & { cloudflareToken?: string } = {
+  httpPort: 8787,
+  httpsPort: 443,
+  httpsEnabled: false,
+  restartRequired: false,
+  ssl: {
+    hostname: "",
+    dnsProvider: "cloudflare",
+    dnsTokenConfigured: false,
+    status: "not_configured"
+  }
 };
 
 export function hasAdminUser(): boolean {
@@ -176,6 +190,77 @@ export function saveUpdateSettings(input: {
   };
   setSetting("update", stored);
   return getUpdateSettings(false);
+}
+
+export function getRuntimeSettings(includeToken = false) {
+  const stored = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const cloudflareToken = stored.cloudflareToken ? decryptSecret(stored.cloudflareToken) : "";
+  return {
+    ...stored,
+    cloudflareToken: includeToken ? cloudflareToken : undefined,
+    restartRequired: Boolean(stored.restartRequired),
+    ssl: {
+      ...stored.ssl,
+      dnsTokenConfigured: Boolean(stored.cloudflareToken)
+    }
+  };
+}
+
+export function saveRuntimeSettings(input: {
+  httpPort: number;
+  httpsPort: number;
+  httpsEnabled: boolean;
+  ssl: {
+    hostname: string;
+    dnsProvider: RuntimeSettings["ssl"]["dnsProvider"];
+    token?: string;
+  };
+}): RuntimeSettings {
+  const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const stored = {
+    ...current,
+    httpPort: input.httpPort,
+    httpsPort: input.httpsPort,
+    httpsEnabled: input.httpsEnabled,
+    restartRequired: true,
+    cloudflareToken: input.ssl.token ? encryptSecret(input.ssl.token) : current.cloudflareToken,
+    ssl: {
+      ...current.ssl,
+      hostname: input.ssl.hostname.trim().toLowerCase(),
+      dnsProvider: input.ssl.dnsProvider,
+      dnsTokenConfigured: Boolean(input.ssl.token || current.cloudflareToken)
+    }
+  };
+  setSetting("runtime", stored);
+  return getRuntimeSettings(false);
+}
+
+export function saveCertificateResult(input: {
+  status: RuntimeSettings["ssl"]["status"];
+  issuedAt?: string;
+  expiresAt?: string;
+  error?: string;
+}): RuntimeSettings {
+  const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const stored = {
+    ...current,
+    restartRequired: input.status === "ready" ? true : current.restartRequired,
+    ssl: {
+      ...current.ssl,
+      status: input.status,
+      issuedAt: input.issuedAt,
+      expiresAt: input.expiresAt,
+      error: input.error
+    }
+  };
+  setSetting("runtime", stored);
+  return getRuntimeSettings(false);
+}
+
+export function clearRuntimeRestartRequired(): RuntimeSettings {
+  const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  setSetting("runtime", { ...current, restartRequired: false });
+  return getRuntimeSettings(false);
 }
 
 export function saveSnapshot(snapshot: HaSnapshot): string {

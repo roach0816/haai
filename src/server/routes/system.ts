@@ -9,6 +9,8 @@ import { getDb, nowIso } from "../db/database.js";
 import { findSessionUser, hasAdminUser, latestRun } from "../db/repositories.js";
 import { sessionCookieName, requireAuth } from "../auth.js";
 import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
+import { writeRuntimeConfig } from "../services/runtimeConfig.js";
+import { clearRuntimeRestartRequired } from "../db/repositories.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +24,11 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         : false,
       version: getConfig().version,
       databasePath: getConfig().databasePath,
+      network: {
+        host: getConfig().host,
+        port: getConfig().port,
+        protocol: getConfig().protocol
+      },
       lastRun: latestRun(),
       update: {
         currentVersion: String(updateRow.current_version),
@@ -83,6 +90,13 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     }
     return getUpdateState();
   });
+
+  app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
+    writeRuntimeConfig();
+    clearRuntimeRestartRequired();
+    void restartApiService();
+    return reply.code(202).send({ restarting: true });
+  });
 }
 
 interface UpdaterResult {
@@ -142,6 +156,24 @@ async function triggerApplyUpdate(): Promise<void> {
   await execFileAsync("sudo", ["-n", "systemctl", "start", "haai-apply-update.service"], {
     timeout: 10_000
   });
+}
+
+async function restartApiService(): Promise<void> {
+  if (process.env.HAAI_RESTART_MODE === "disabled") return;
+  if (process.env.HAAI_RESTART_MODE === "direct") {
+    setTimeout(() => {
+      process.exit(0);
+    }, 500);
+    return;
+  }
+
+  setTimeout(() => {
+    void execFileAsync("sudo", ["-n", "systemctl", "restart", "haai-api.service"], {
+      timeout: 10_000
+    }).catch((error) => {
+      console.error(formatExecError(error));
+    });
+  }, 500);
 }
 
 function formatExecError(error: unknown): string {

@@ -1,5 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import type { AiSettings, HomeAssistantSettings, SystemHealth, UpdateSettings } from "../../shared/types";
+import type {
+  AiSettings,
+  HomeAssistantSettings,
+  RuntimeSettings,
+  SystemHealth,
+  UpdateSettings
+} from "../../shared/types";
 import { api } from "../lib/api";
 
 const providerModels = {
@@ -34,11 +40,26 @@ export function Settings() {
     githubTokenConfigured: false,
     manifestUrl: ""
   });
+  const [runtime, setRuntime] = useState<RuntimeSettings>({
+    httpPort: 8787,
+    httpsPort: 443,
+    httpsEnabled: false,
+    restartRequired: false,
+    ssl: {
+      hostname: "",
+      dnsProvider: "cloudflare",
+      dnsTokenConfigured: false,
+      status: "not_configured"
+    }
+  });
   const [githubToken, setGithubToken] = useState("");
+  const [cloudflareToken, setCloudflareToken] = useState("");
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [certificateRequesting, setCertificateRequesting] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [updateSettingsOpen, setUpdateSettingsOpen] = useState(false);
   const autoUpdateCheckStarted = useRef(false);
 
@@ -49,13 +70,15 @@ export function Settings() {
       api.getHomeAssistantSettings(),
       api.getAiSettings(),
       api.getUpdateSettings(),
+      api.getRuntimeSettings(),
       api.health()
     ]).then(
-      ([haSettings, aiSettings, updateSettings, healthState]) => {
+      ([haSettings, aiSettings, updateSettings, runtimeSettings, healthState]) => {
         if (cancelled) return;
         setHa(haSettings);
         setAi(aiSettings);
         setUpdate(updateSettings);
+        setRuntime(runtimeSettings);
         setHealth(healthState);
         if (!autoUpdateCheckStarted.current && updateSettingsReady(updateSettings)) {
           autoUpdateCheckStarted.current = true;
@@ -121,6 +144,61 @@ export function Settings() {
     setMessage("Update settings saved.");
     if (updateSettingsReady(saved)) {
       await runUpdateCheck({ showMessage: true });
+    }
+  }
+
+  async function saveRuntime(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      const saved = await api.saveRuntimeSettings({
+        httpPort: runtime.httpPort,
+        httpsPort: runtime.httpsPort,
+        httpsEnabled: runtime.httpsEnabled,
+        ssl: {
+          hostname: runtime.ssl.hostname,
+          dnsProvider: runtime.ssl.dnsProvider,
+          token: cloudflareToken || undefined
+        }
+      });
+      setRuntime(saved);
+      setCloudflareToken("");
+      setMessage("Network and TLS settings saved. Restart the service to apply listener changes.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network settings failed to save");
+    }
+  }
+
+  async function requestCertificate() {
+    setError("");
+    setCertificateRequesting(true);
+    try {
+      const saved = await api.requestCertificate();
+      setRuntime(saved);
+      if (saved.ssl.status === "failed") {
+        setError(saved.ssl.error ?? "Certificate request failed");
+      } else {
+        setMessage("Certificate request complete. Restart the service to use HTTPS.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Certificate request failed");
+    } finally {
+      setCertificateRequesting(false);
+    }
+  }
+
+  async function restartService() {
+    setError("");
+    setRestarting(true);
+    try {
+      await api.restartService();
+      setMessage("Restart requested. The app may be unavailable for a few seconds.");
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Service restart failed");
+      setRestarting(false);
     }
   }
 
@@ -288,8 +366,115 @@ export function Settings() {
           </div>
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
+          <p>
+            Active listener: {health?.network.protocol ?? "http"}://{health?.network.host ?? "0.0.0.0"}:
+            {health?.network.port ?? runtime.httpPort}
+          </p>
           <p className="muted">The API service is managed by systemd and stores local data on this Pi.</p>
         </section>
+
+        <form className="panel" onSubmit={saveRuntime}>
+          <div className="panel-heading">
+            <h2>Network & TLS</h2>
+            <TlsBadge runtime={runtime} />
+          </div>
+          <p className="muted">
+            Port 8787 is the unprivileged default. Use 80/443 on the Pi, or map container ports externally.
+          </p>
+          <div className="two-col">
+            <label>
+              HTTP port
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                value={runtime.httpPort}
+                onChange={(event) => setRuntime({ ...runtime, httpPort: Number(event.target.value) })}
+              />
+            </label>
+            <label>
+              HTTPS port
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                value={runtime.httpsPort}
+                onChange={(event) => setRuntime({ ...runtime, httpsPort: Number(event.target.value) })}
+              />
+            </label>
+          </div>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={runtime.httpsEnabled}
+              onChange={(event) => setRuntime({ ...runtime, httpsEnabled: event.target.checked })}
+            />
+            Serve the app with HTTPS when a certificate is ready
+          </label>
+          <div className="field-group">
+            <h3>SSL certificate</h3>
+            <label>
+              Hostname
+              <input
+                placeholder="haai.example.com"
+                value={runtime.ssl.hostname}
+                onChange={(event) =>
+                  setRuntime({ ...runtime, ssl: { ...runtime.ssl, hostname: event.target.value } })
+                }
+              />
+            </label>
+            <label>
+              DNS provider
+              <select
+                value={runtime.ssl.dnsProvider}
+                onChange={(event) =>
+                  setRuntime({
+                    ...runtime,
+                    ssl: { ...runtime.ssl, dnsProvider: event.target.value as RuntimeSettings["ssl"]["dnsProvider"] }
+                  })
+                }
+              >
+                <option value="cloudflare">Cloudflare</option>
+              </select>
+            </label>
+            <label>
+              Token {runtime.ssl.dnsTokenConfigured ? "(configured)" : ""}
+              <input
+                type="password"
+                value={cloudflareToken}
+                onChange={(event) => setCloudflareToken(event.target.value)}
+                placeholder={runtime.ssl.dnsTokenConfigured ? "Leave blank to keep existing token" : "Paste Cloudflare token"}
+              />
+            </label>
+            <div className="cert-status">
+              <span>Status: {formatCertStatus(runtime.ssl.status)}</span>
+              {runtime.ssl.expiresAt ? <span>Expires: {new Date(runtime.ssl.expiresAt).toLocaleDateString()}</span> : null}
+            </div>
+            {runtime.ssl.error ? <p className="error">{runtime.ssl.error}</p> : null}
+          </div>
+          {runtime.restartRequired ? (
+            <p className="muted">A service restart is required before saved listener changes take effect.</p>
+          ) : null}
+          <div className="button-row">
+            <button>Save network settings</button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={requestCertificate}
+              disabled={certificateRequesting || !runtime.ssl.hostname}
+            >
+              {certificateRequesting ? "Requesting..." : "Request certificate"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={restartService}
+              disabled={restarting}
+            >
+              {restarting ? "Restarting..." : "Restart service"}
+            </button>
+          </div>
+        </form>
 
         <section className="panel">
           <div className="panel-heading">
@@ -359,6 +544,20 @@ function updateSettingsReady(settings: UpdateSettings): boolean {
     return Boolean(settings.githubOwner && settings.githubRepo && settings.githubTokenConfigured);
   }
   return Boolean(settings.manifestUrl);
+}
+
+function TlsBadge({ runtime }: { runtime: RuntimeSettings }) {
+  if (runtime.ssl.status === "failed") return <span className="status-badge danger">Certificate failed</span>;
+  if (runtime.ssl.status === "requesting") return <span className="status-badge info">Requesting</span>;
+  if (runtime.httpsEnabled && runtime.ssl.status === "ready") {
+    return <span className="status-badge success">HTTPS ready</span>;
+  }
+  if (runtime.ssl.status === "ready") return <span className="status-badge warning">Restart required</span>;
+  return <span className="status-badge neutral">HTTP active</span>;
+}
+
+function formatCertStatus(status: RuntimeSettings["ssl"]["status"]): string {
+  return status.replace("_", " ");
 }
 
 function UpdateBadge({ health, checking }: { health: SystemHealth | null; checking: boolean }) {
