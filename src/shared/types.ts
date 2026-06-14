@@ -98,5 +98,6 @@ export interface SystemHealth {
     availableVersion?: string;
     checkedAt?: string;
     status: "idle" | "checking" | "available" | "applying" | "failed";
+    error?: string;
   };
 }

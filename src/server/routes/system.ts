@@ -29,7 +29,8 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
           ? String(updateRow.available_version)
           : undefined,
         checkedAt: updateRow.checked_at ? String(updateRow.checked_at) : undefined,
-        status: updateRow.status
+        status: updateRow.status,
+        error: updateRow.error ? String(updateRow.error) : undefined
       }
     };
   });
@@ -41,17 +42,29 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/system/update", { preHandler: requireAuth }, async (request) => {
     const body = z.object({ action: z.enum(["check", "apply"]) }).parse(request.body);
     if (body.action === "check") {
-      const check = await runUpdaterCheck();
-      getDb()
-        .prepare(
-          "UPDATE update_state SET status = ?, current_version = ?, available_version = ?, checked_at = ?, error = NULL WHERE id = 1"
-        )
-        .run(
-          check.status,
-          check.currentVersion,
-          check.availableVersion ?? null,
-          check.checkedAt ?? nowIso()
-        );
+      try {
+        const check = await runUpdaterCheck();
+        getDb()
+          .prepare(
+            "UPDATE update_state SET status = ?, current_version = ?, available_version = ?, checked_at = ?, error = NULL WHERE id = 1"
+          )
+          .run(
+            check.status,
+            check.currentVersion,
+            check.availableVersion ?? null,
+            check.checkedAt ?? nowIso()
+          );
+      } catch (error) {
+        const failed = readUpdaterStateFile();
+        getDb()
+          .prepare(
+            "UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1"
+          )
+          .run(
+            failed?.checkedAt ?? nowIso(),
+            failed?.error ?? (error instanceof Error ? error.message : "Update check failed")
+          );
+      }
     } else {
       await triggerApplyUpdate();
       getDb()

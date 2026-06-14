@@ -160,9 +160,16 @@ async function readGitHubRelease() {
     throw new Error("HAAI_GITHUB_OWNER, HAAI_GITHUB_REPO, and HAAI_GITHUB_TOKEN are required");
   }
 
-  const release = await githubFetchJson(
-    `https://api.github.com/repos/${encodeURIComponent(githubOwner)}/${encodeURIComponent(githubRepo)}/releases/latest`
+  const releases = await githubFetchJson(
+    `https://api.github.com/repos/${encodeURIComponent(githubOwner)}/${encodeURIComponent(githubRepo)}/releases?per_page=30`
   );
+  if (!Array.isArray(releases)) {
+    throw new Error("GitHub releases response was not a list");
+  }
+  const release = selectGitHubRelease(releases);
+  if (!release) {
+    throw new Error("No published GitHub releases found for this repository");
+  }
   const version = normalizeVersion(String(release.tag_name ?? release.name ?? ""));
   const assets = Array.isArray(release.assets) ? release.assets : [];
   const archiveAsset =
@@ -194,6 +201,18 @@ async function readGitHubRelease() {
     sha256,
     headers: githubDownloadHeaders()
   };
+}
+
+function selectGitHubRelease(releases) {
+  const published = releases.filter((release) => !release.draft);
+  const semverReleases = published
+    .map((release) => ({ release, version: parseSemver(normalizeVersion(String(release.tag_name ?? ""))) }))
+    .filter((item) => item.version);
+  if (semverReleases.length) {
+    semverReleases.sort((a, b) => compareSemver(b.version, a.version));
+    return semverReleases[0].release;
+  }
+  return published[0];
 }
 
 async function readManifest() {
@@ -276,6 +295,20 @@ function verifySha256(filePath, expected) {
 
 function normalizeVersion(version) {
   return String(version).trim().replace(/^v/i, "");
+}
+
+function parseSemver(version) {
+  const match = String(version).match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3])
+  };
+}
+
+function compareSemver(a, b) {
+  return a.major - b.major || a.minor - b.minor || a.patch - b.patch;
 }
 
 function resolveArchiveUrl(archiveUrl) {

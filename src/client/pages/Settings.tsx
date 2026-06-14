@@ -96,8 +96,19 @@ export function Settings() {
   }
 
   async function checkUpdate() {
-    await api.update("check");
-    setHealth(await api.health());
+    setError("");
+    try {
+      await api.update("check");
+      const nextHealth = await api.health();
+      setHealth(nextHealth);
+      setMessage(
+        nextHealth.update.status === "failed"
+          ? "Update check failed. See the updater message below."
+          : "Update check complete."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update check failed");
+    }
   }
 
   return (
@@ -223,6 +234,7 @@ export function Settings() {
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
           <p>Updater: {health?.update.status ?? "idle"}</p>
+          {health?.update.error ? <p className="error">{health.update.error}</p> : null}
           <label>
             Update source
             <select
