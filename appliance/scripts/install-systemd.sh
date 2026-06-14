@@ -34,6 +34,17 @@ do
   fi
 done
 
+install_unless_same() {
+  local mode="$1"
+  local source="$2"
+  local destination="$3"
+  if [[ "$(readlink -f "${source}")" == "$(readlink -f "${destination}" 2>/dev/null || true)" ]]; then
+    chmod "${mode}" "${destination}"
+    return
+  fi
+  install -o root -g root -m "${mode}" "${source}" "${destination}"
+}
+
 install -d -o root -g root -m 0755 /etc/haai
 install -d -o root -g root -m 0755 "${APP_DIR}"
 
@@ -55,8 +66,8 @@ install -o root -g root -m 0644 appliance/systemd/haai-api.service /etc/systemd/
 install -o root -g root -m 0644 appliance/systemd/haai-updater.service /etc/systemd/system/haai-updater.service
 install -o root -g root -m 0644 appliance/systemd/haai-updater.timer /etc/systemd/system/haai-updater.timer
 install -o root -g root -m 0644 appliance/systemd/haai-apply-update.service /etc/systemd/system/haai-apply-update.service
-install -o root -g root -m 0755 appliance/scripts/haai-update "${APP_DIR}/appliance/scripts/haai-update"
-install -o root -g root -m 0755 appliance/scripts/haai-update.mjs "${APP_DIR}/appliance/scripts/haai-update.mjs"
+install_unless_same 0755 appliance/scripts/haai-update "${APP_DIR}/appliance/scripts/haai-update"
+install_unless_same 0755 appliance/scripts/haai-update.mjs "${APP_DIR}/appliance/scripts/haai-update.mjs"
 install -d -o root -g root -m 0755 /etc/sudoers.d
 install -o root -g root -m 0440 appliance/sudoers/haai-updater /etc/sudoers.d/haai-updater
 visudo -cf /etc/sudoers.d/haai-updater
