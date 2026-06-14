@@ -3,11 +3,12 @@ import type { ReactNode } from "react";
 interface Props {
   page: string;
   setPage: (page: string) => void;
+  onProfile: () => void;
   onLogout: () => void;
   children: ReactNode;
 }
 
-export function Layout({ page, setPage, onLogout, children }: Props) {
+export function Layout({ page, setPage, onProfile, onLogout, children }: Props) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -26,7 +27,10 @@ export function Layout({ page, setPage, onLogout, children }: Props) {
             Settings
           </button>
         </nav>
-        <button className="ghost" onClick={onLogout}>Sign out</button>
+        <div className="sidebar-actions">
+          <button className="ghost" onClick={onProfile}>Profile</button>
+          <button className="ghost" onClick={onLogout}>Sign out</button>
+        </div>
       </aside>
       <section key={page} className="content">{children}</section>
     </div>

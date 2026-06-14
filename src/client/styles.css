@@ -1,9 +1,102 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #14213d;
-  background: #f5f7fb;
+  --app-bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e3e9f2;
+  --border-strong: #d7dee8;
+  --text: #14213d;
+  --text-muted: #65778a;
+  --text-soft: #6b7b8f;
+  --label: #34495e;
+  --primary: #0b6bcb;
+  --primary-strong: #0b4a8b;
+  --primary-soft: #dbeafe;
+  --primary-subtle: #e8f2ff;
+  --shadow: rgba(20, 33, 61, 0.06);
+  --shadow-strong: rgba(15, 23, 42, 0.22);
+  --danger-text: #8a1f1f;
+  --danger-bg: #fff1f1;
+  --success-text: #17633a;
+  --success-bg: #ecfdf3;
+  --code-bg: #111827;
+  --code-text: #edf2ff;
+  color: var(--text);
+  background: var(--app-bg);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #0f172a;
+  --surface: #111827;
+  --surface-muted: #182235;
+  --border: #263449;
+  --border-strong: #334155;
+  --text: #e5edf8;
+  --text-muted: #a8b5c7;
+  --text-soft: #93a4b8;
+  --label: #d7e1ee;
+  --primary: #60a5fa;
+  --primary-strong: #bfdbfe;
+  --primary-soft: #1e3a5f;
+  --primary-subtle: #172d4d;
+  --shadow: rgba(0, 0, 0, 0.22);
+  --shadow-strong: rgba(0, 0, 0, 0.42);
+  --danger-text: #fecaca;
+  --danger-bg: #4b1515;
+  --success-text: #bbf7d0;
+  --success-bg: #12351f;
+  --code-bg: #020617;
+  --code-text: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    color-scheme: dark;
+    --app-bg: #0f172a;
+    --surface: #111827;
+    --surface-muted: #182235;
+    --border: #263449;
+    --border-strong: #334155;
+    --text: #e5edf8;
+    --text-muted: #a8b5c7;
+    --text-soft: #93a4b8;
+    --label: #d7e1ee;
+    --primary: #60a5fa;
+    --primary-strong: #bfdbfe;
+    --primary-soft: #1e3a5f;
+    --primary-subtle: #172d4d;
+    --shadow: rgba(0, 0, 0, 0.22);
+    --shadow-strong: rgba(0, 0, 0, 0.42);
+    --danger-text: #fecaca;
+    --danger-bg: #4b1515;
+    --success-text: #bbf7d0;
+    --success-bg: #12351f;
+    --code-bg: #020617;
+    --code-text: #e2e8f0;
+  }
+
+  :root[data-theme="auto"] .status-badge.info {
+    background: #0c4a6e;
+    color: #bae6fd;
+  }
+
+  :root[data-theme="auto"] .status-badge.success {
+    background: #14532d;
+    color: #bbf7d0;
+  }
+
+  :root[data-theme="auto"] .status-badge.warning {
+    background: #713f12;
+    color: #fde68a;
+  }
+
+  :root[data-theme="auto"] .status-badge.danger {
+    background: #7f1d1d;
+    color: #fecaca;
+  }
 }
 
 * {
@@ -12,6 +105,7 @@
 
 body {
   margin: 0;
+  background: var(--app-bg);
 }
 
 button,
@@ -23,8 +117,8 @@ select {
 button {
   border: 0;
   border-radius: 8px;
-  background: #0b6bcb;
-  color: white;
+  background: var(--primary);
+  color: var(--surface);
   padding: 0.75rem 1rem;
   cursor: pointer;
   font-weight: 700;
@@ -45,28 +139,29 @@ button:disabled {
 }
 
 button.secondary {
-  background: #dbeafe;
-  color: #0b4a8b;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 button.ghost {
   background: transparent;
-  color: #476174;
+  color: var(--label);
 }
 
 input,
 select {
   width: 100%;
-  border: 1px solid #d7dee8;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.72rem 0.8rem;
-  background: white;
+  background: var(--surface);
+  color: var(--text);
 }
 
 label {
   display: grid;
   gap: 0.45rem;
-  color: #34495e;
+  color: var(--label);
   font-weight: 700;
 }
 
@@ -84,9 +179,10 @@ label {
 .empty,
 .stat {
   background: white;
-  border: 1px solid #e3e9f2;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 12px 32px rgba(20, 33, 61, 0.06);
+  box-shadow: 0 12px 32px var(--shadow);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -96,8 +192,8 @@ label {
 .panel:hover,
 .suggestion:hover,
 .stat:hover {
-  border-color: #d5e1ee;
-  box-shadow: 0 14px 36px rgba(20, 33, 61, 0.08);
+  border-color: var(--border-strong);
+  box-shadow: 0 14px 36px var(--shadow);
 }
 
 .auth-card {
@@ -114,8 +210,8 @@ label {
 }
 
 .sidebar {
-  background: #ffffff;
-  border-right: 1px solid #e3e9f2;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -137,14 +233,14 @@ label {
   width: 42px;
   height: 42px;
   border-radius: 8px;
-  background: #0b6bcb;
-  color: white;
+  background: var(--primary);
+  color: var(--surface);
   font-weight: 900;
 }
 
 .brand span:last-child {
   display: block;
-  color: #6b7b8f;
+  color: var(--text-soft);
   font-size: 0.86rem;
 }
 
@@ -155,14 +251,20 @@ nav {
 
 nav button {
   background: transparent;
-  color: #34495e;
+  color: var(--label);
   text-align: left;
   position: relative;
 }
 
 nav button.active {
-  background: #e8f2ff;
-  color: #0b4a8b;
+  background: var(--primary-subtle);
+  color: var(--primary-strong);
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: auto;
 }
 
 .content {
@@ -186,7 +288,7 @@ p {
 }
 
 .eyebrow {
-  color: #0b6bcb;
+  color: var(--primary);
   font-size: 0.78rem;
   text-transform: uppercase;
   font-weight: 900;
@@ -195,7 +297,7 @@ p {
 }
 
 .muted {
-  color: #65778a;
+  color: var(--text-muted);
 }
 
 .error,
@@ -206,13 +308,13 @@ p {
 }
 
 .error {
-  color: #8a1f1f;
-  background: #fff1f1;
+  color: var(--danger-text);
+  background: var(--danger-bg);
 }
 
 .success {
-  color: #17633a;
-  background: #ecfdf3;
+  color: var(--success-text);
+  background: var(--success-bg);
 }
 
 .stats-grid {
@@ -272,8 +374,8 @@ p {
 .pill,
 .evidence span {
   border-radius: 999px;
-  background: #edf4fb;
-  color: #30536f;
+  background: var(--surface-muted);
+  color: var(--label);
   padding: 0.32rem 0.55rem;
   font-weight: 800;
   font-size: 0.82rem;
@@ -289,8 +391,8 @@ pre {
   margin: 0;
   overflow: auto;
   border-radius: 8px;
-  background: #111827;
-  color: #edf2ff;
+  background: var(--code-bg);
+  color: var(--code-text);
   padding: 1rem;
   font-size: 0.9rem;
   line-height: 1.45;
@@ -338,8 +440,8 @@ pre {
 }
 
 .status-badge.neutral {
-  background: #eef2f7;
-  color: #53657a;
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .status-badge.info {
@@ -362,6 +464,26 @@ pre {
   color: #991b1b;
 }
 
+:root[data-theme="dark"] .status-badge.info {
+  background: #0c4a6e;
+  color: #bae6fd;
+}
+
+:root[data-theme="dark"] .status-badge.success {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+:root[data-theme="dark"] .status-badge.warning {
+  background: #713f12;
+  color: #fde68a;
+}
+
+:root[data-theme="dark"] .status-badge.danger {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
 .version-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -369,7 +491,7 @@ pre {
 }
 
 .version-grid div {
-  border: 1px solid #e3e9f2;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.85rem;
   display: grid;
@@ -377,7 +499,7 @@ pre {
 }
 
 .version-grid span {
-  color: #65778a;
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 800;
 }
@@ -395,21 +517,21 @@ pre {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  color: #34495e;
+  color: var(--label);
   font-weight: 800;
 }
 
 .progress-track {
   height: 10px;
   border-radius: 999px;
-  background: #e8eef7;
+  background: var(--surface-muted);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: #0b6bcb;
+  background: var(--primary);
   transition: width 180ms ease;
 }
 
@@ -419,15 +541,15 @@ pre {
 }
 
 .release-notes a {
-  color: #0b6bcb;
+  color: var(--primary);
   font-weight: 800;
   text-decoration: none;
 }
 
 .notes-box {
-  background: #f8fafc;
-  color: #24384f;
-  border: 1px solid #e3e9f2;
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--border);
   max-height: 280px;
 }
 
@@ -446,10 +568,10 @@ pre {
   width: min(620px, 100%);
   max-height: min(760px, calc(100vh - 2rem));
   overflow: auto;
-  background: white;
-  border: 1px solid #dbe4ef;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 26px 70px var(--shadow-strong);
   padding: 1rem;
   display: grid;
   gap: 1rem;
@@ -473,7 +595,7 @@ pre {
 }
 
 .field-group {
-  border: 1px solid #e3e9f2;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.9rem;
   display: grid;
@@ -498,7 +620,7 @@ pre {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  color: #65778a;
+  color: var(--text-muted);
   font-weight: 800;
 }
 

@@ -26,7 +26,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   health: () => request<SystemHealth>("/api/system/health"),
-  me: () => request<{ setupComplete: boolean; authenticated: boolean }>("/api/auth/me"),
+  me: () => request<{ setupComplete: boolean; authenticated: boolean; username?: string }>("/api/auth/me"),
   setup: (body: { username: string; password: string }) =>
     request<{ authenticated: boolean }>("/api/auth/setup", {
       method: "POST",
@@ -38,6 +38,11 @@ export const api = {
       body: JSON.stringify(body)
     }),
   logout: () => request<{ authenticated: boolean }>("/api/auth/logout", { method: "POST" }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    request<{ changed: boolean }>("/api/auth/password", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
   getHomeAssistantSettings: () =>
     request<HomeAssistantSettings>("/api/settings/home-assistant"),
   saveHomeAssistantSettings: (

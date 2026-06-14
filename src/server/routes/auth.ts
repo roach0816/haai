@@ -3,16 +3,23 @@ import { z } from "zod";
 import { sessionCookieName } from "../auth.js";
 import {
   authenticate,
+  changeUserPassword,
   createAdminUser,
   createSession,
   deleteSession,
   findSessionUser,
+  findUserById,
   hasAdminUser
 } from "../db/repositories.js";
 
 const credentialSchema = z.object({
   username: z.string().min(3).max(80),
   password: z.string().min(8).max(200)
+});
+
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(8).max(200),
+  newPassword: z.string().min(8).max(200)
 });
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -40,10 +47,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/auth/me", async (request) => {
     const setupComplete = hasAdminUser();
-    const authenticated = setupComplete
-      ? Boolean(findSessionUser(request.cookies?.[sessionCookieName]))
-      : false;
-    return { setupComplete, authenticated };
+    const userId = setupComplete ? findSessionUser(request.cookies?.[sessionCookieName]) : null;
+    const user = userId ? findUserById(userId) : null;
+    return { setupComplete, authenticated: Boolean(userId), username: user?.username };
+  });
+
+  app.post("/api/auth/password", async (request, reply) => {
+    const userId = findSessionUser(request.cookies?.[sessionCookieName]);
+    if (!userId) return reply.code(401).send({ error: "Authentication required" });
+
+    const body = passwordChangeSchema.parse(request.body);
+    if (body.currentPassword === body.newPassword) {
+      return reply.code(400).send({ error: "New password must be different from current password" });
+    }
+
+    const changed = await changeUserPassword(userId, body.currentPassword, body.newPassword);
+    if (!changed) return reply.code(401).send({ error: "Current password is incorrect" });
+    return { changed: true };
   });
 }
 

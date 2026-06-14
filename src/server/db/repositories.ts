@@ -73,6 +73,31 @@ export async function authenticate(username: string, password: string): Promise<
   return user.id;
 }
 
+export function findUserById(userId: string): { id: string; username: string } | null {
+  const user = getDb()
+    .prepare("SELECT id, username FROM users WHERE id = ?")
+    .get(userId) as { id: string; username: string } | undefined;
+  return user ?? null;
+}
+
+export async function changeUserPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<boolean> {
+  const user = getDb()
+    .prepare("SELECT password_hash FROM users WHERE id = ?")
+    .get(userId) as { password_hash: string } | undefined;
+  if (!user) return false;
+
+  const currentMatches = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!currentMatches) return false;
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  getDb().prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, userId);
+  return true;
+}
+
 export function createSession(userId: string): string {
   const token = createId("sess");
   const sessionId = createId("sid");
