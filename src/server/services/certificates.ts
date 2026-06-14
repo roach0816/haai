@@ -1,5 +1,5 @@
 import * as acme from "acme-client";
-import crypto from "node:crypto";
+import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { getRuntimeSettings, saveCertificateResult } from "../db/repositories.js";
@@ -61,11 +61,11 @@ export async function requestLetsEncryptCertificate() {
         challengePriority: ["dns-01"],
         challengeCreateFn: async (authz, _challenge, keyAuthorization) => {
           const recordName = `_acme-challenge.${authz.identifier.value}`;
-          const recordValue = dnsChallengeValue(keyAuthorization);
+          const recordValue = keyAuthorization;
           const zone = await findCloudflareZone(hostname, cloudflareToken);
           const record = await createTxtRecord(zone.id, recordName, recordValue, cloudflareToken);
           createdRecords.push({ zoneId: zone.id, recordId: record.id });
-          await waitForDnsPropagation();
+          await waitForDnsPropagation(recordName, recordValue);
         },
         challengeRemoveFn: async () => {
           await Promise.allSettled(
@@ -162,13 +162,31 @@ async function cloudflare<T>(
   return body.result as T;
 }
 
-async function waitForDnsPropagation(): Promise<void> {
-  const seconds = Number(process.env.HAAI_DNS_PROPAGATION_SECONDS ?? 60);
-  await new Promise((resolve) => setTimeout(resolve, Math.max(1, seconds) * 1000));
+async function waitForDnsPropagation(recordName: string, expectedValue: string): Promise<void> {
+  const timeoutMs = Math.max(30, Number(process.env.HAAI_DNS_PROPAGATION_SECONDS ?? 180)) * 1000;
+  const startedAt = Date.now();
+  let lastValues: string[] = [];
+
+  while (Date.now() - startedAt < timeoutMs) {
+    lastValues = await readTxtRecords(recordName);
+    if (lastValues.includes(expectedValue)) return;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+
+  throw new Error(
+    `DNS TXT record ${recordName} did not publish the expected Let's Encrypt authorization value within ${Math.round(
+      timeoutMs / 1000
+    )} seconds. Last values: ${lastValues.length ? lastValues.join(", ") : "none"}`
+  );
 }
 
-function dnsChallengeValue(keyAuthorization: string): string {
-  return crypto.createHash("sha256").update(keyAuthorization).digest("base64url");
+async function readTxtRecords(recordName: string): Promise<string[]> {
+  try {
+    const records = await dns.resolveTxt(recordName);
+    return records.map((parts) => parts.join(""));
+  } catch {
+    return [];
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
