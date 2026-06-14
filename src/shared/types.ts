@@ -47,6 +47,7 @@ export interface RuntimeSettings {
     dnsProvider: "cloudflare";
     dnsTokenConfigured: boolean;
     status: "not_configured" | "ready" | "requesting" | "failed";
+    requestedAt?: string;
     issuedAt?: string;
     expiresAt?: string;
     error?: string;

@@ -193,6 +193,18 @@ export function Settings() {
     }
   }
 
+  async function resetCertificate() {
+    setError("");
+    try {
+      const saved = await api.resetCertificate();
+      setRuntime(saved);
+      setCertificateRequesting(false);
+      setMessage("Certificate status reset.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Certificate reset failed");
+    }
+  }
+
   async function restartService() {
     setError("");
     setRestarting(true);
@@ -455,6 +467,7 @@ export function Settings() {
             </label>
             <div className="cert-status">
               <span>Status: {formatCertStatus(runtime.ssl.status)}</span>
+              {runtime.ssl.requestedAt ? <span>Started: {new Date(runtime.ssl.requestedAt).toLocaleString()}</span> : null}
               {runtime.ssl.expiresAt ? <span>Expires: {new Date(runtime.ssl.expiresAt).toLocaleDateString()}</span> : null}
             </div>
             {runtime.ssl.error ? <p className="error">{runtime.ssl.error}</p> : null}
@@ -468,9 +481,17 @@ export function Settings() {
               type="button"
               className="secondary"
               onClick={requestCertificate}
-              disabled={certificateRequesting || !runtime.ssl.hostname}
+              disabled={certificateRequesting || runtime.ssl.status === "requesting" || !runtime.ssl.hostname}
             >
               {certificateRequesting ? "Requesting..." : "Request certificate"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={resetCertificate}
+              disabled={certificateRequesting || !["requesting", "failed"].includes(runtime.ssl.status)}
+            >
+              Reset certificate status
             </button>
             <button
               type="button"

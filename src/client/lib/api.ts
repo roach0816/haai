@@ -80,6 +80,10 @@ export const api = {
     request<RuntimeSettings>("/api/settings/runtime/certificate", {
       method: "POST"
     }),
+  resetCertificate: () =>
+    request<RuntimeSettings>("/api/settings/runtime/certificate/reset", {
+      method: "POST"
+    }),
   restartService: () => request<{ restarting: boolean }>("/api/system/restart", { method: "POST" }),
   startAnalysis: () =>
     request<{ runId: string }>("/api/analysis-runs", {

@@ -6,6 +6,7 @@ import {
   getHomeAssistantSettings,
   getRuntimeSettings,
   getUpdateSettings,
+  resetCertificateRequest,
   saveAiSettings,
   saveHomeAssistantSettings,
   saveRuntimeSettings,
@@ -91,5 +92,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () =>
     requestLetsEncryptCertificate()
+  );
+
+  app.post("/api/settings/runtime/certificate/reset", { preHandler: requireAuth }, async () =>
+    resetCertificateRequest()
   );
 }

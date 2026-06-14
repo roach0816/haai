@@ -238,6 +238,7 @@ export function saveRuntimeSettings(input: {
 
 export function saveCertificateResult(input: {
   status: RuntimeSettings["ssl"]["status"];
+  requestedAt?: string;
   issuedAt?: string;
   expiresAt?: string;
   error?: string;
@@ -249,9 +250,25 @@ export function saveCertificateResult(input: {
     ssl: {
       ...current.ssl,
       status: input.status,
+      requestedAt: input.requestedAt,
       issuedAt: input.issuedAt,
       expiresAt: input.expiresAt,
       error: input.error
+    }
+  };
+  setSetting("runtime", stored);
+  return getRuntimeSettings(false);
+}
+
+export function resetCertificateRequest(): RuntimeSettings {
+  const current = getSetting<typeof defaultRuntimeSettings>("runtime", defaultRuntimeSettings);
+  const stored = {
+    ...current,
+    ssl: {
+      ...current.ssl,
+      status: "not_configured" as const,
+      requestedAt: undefined,
+      error: undefined
     }
   };
   setSetting("runtime", stored);
