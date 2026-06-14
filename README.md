@@ -111,7 +111,7 @@ Create the local admin user, then go to Settings and configure:
 
 ## Ports and TLS
 
-The app defaults to port `8787` because ports below `1024` usually require extra Linux privileges. The systemd service grants only `CAP_NET_BIND_SERVICE`, which allows the non-root `haai` user to bind ports such as `80` and `443` without running the app as root.
+The app defaults to port `8787` because ports below `1024` usually require extra Linux privileges. The systemd service grants ambient `CAP_NET_BIND_SERVICE`, which allows the non-root `haai` user to bind ports such as `80` and `443` without running the app as root. The service intentionally does not narrow `CapabilityBoundingSet`, because the GUI updater and restart controls use a tightly scoped sudoers rule to start root-owned systemd units.
 
 To use standard web ports on the Pi:
 
