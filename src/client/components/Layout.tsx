@@ -29,13 +29,6 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
   return (
     <div className={`app-shell${menuOpen ? " menu-open" : ""}`}>
       <header className="mobile-topbar">
-        <div className="brand compact">
-          <span className="brand-mark">HA</span>
-          <div>
-            <strong>Home AI</strong>
-            <span>Read-only advisor</span>
-          </div>
-        </div>
         <button
           type="button"
           className="secondary menu-toggle"
@@ -47,6 +40,13 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
           <span />
           <span />
         </button>
+        <div className="brand compact">
+          <span className="brand-mark">HA</span>
+          <div>
+            <strong>Home AI</strong>
+            <span>Read-only advisor</span>
+          </div>
+        </div>
       </header>
       <button
         type="button"
