@@ -29,12 +29,16 @@ export function AiConfiguration() {
   });
   const [apiKey, setApiKey] = useState("");
   const [mcpAuthorization, setMcpAuthorization] = useState("");
+  const [allowedToolsInput, setAllowedToolsInput] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     void api.getAiSettings()
-      .then(setAi)
+      .then((settings) => {
+        setAi(settings);
+        setAllowedToolsInput(settings.mcp.allowedTools.join(", "));
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "AI settings failed to load"));
   }, []);
 
@@ -45,12 +49,14 @@ export function AiConfiguration() {
     try {
       const saved = await api.saveAiSettings({
         ...ai,
+        mcp: { ...ai.mcp, allowedTools: splitList(allowedToolsInput) },
         apiKey: apiKey || undefined,
         mcpAuthorization: mcpAuthorization || undefined
       });
       setAi(saved);
       setApiKey("");
       setMcpAuthorization("");
+      setAllowedToolsInput(saved.mcp.allowedTools.join(", "));
       setMessage("AI configuration saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI configuration failed to save");
@@ -200,10 +206,8 @@ export function AiConfiguration() {
           <label>
             Allowed tools
             <input
-              value={ai.mcp.allowedTools.join(", ")}
-              onChange={(event) =>
-                setAi({ ...ai, mcp: { ...ai.mcp, allowedTools: splitList(event.target.value) } })
-              }
+              value={allowedToolsInput}
+              onChange={(event) => setAllowedToolsInput(event.target.value)}
               placeholder="Optional: get_states, get_history"
             />
           </label>
