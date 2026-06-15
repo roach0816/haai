@@ -33,10 +33,16 @@ const effortSchema = z.preprocess((value) => {
 
 const stringArraySchema = (maxItems: number, maxLength: number) =>
   z.preprocess((value) => {
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string" && value.trim()) return [value.trim()];
+    if (Array.isArray(value)) return value.map((item) => normalizeBoundedString(item, maxLength));
+    if (typeof value === "string" && value.trim()) return [normalizeBoundedString(value, maxLength)];
     return value;
   }, z.array(z.string().min(3).max(maxLength)).min(1).max(maxItems));
+
+function normalizeBoundedString(value: unknown, maxLength: number): unknown {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}…` : trimmed;
+}
 
 export const aiSuggestionSchema = z.object({
   category: z.enum(suggestionCategories),

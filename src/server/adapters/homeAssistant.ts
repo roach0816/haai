@@ -22,6 +22,15 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+class HomeAssistantApiError extends Error {
+  constructor(
+    public readonly path: string,
+    public readonly status: number
+  ) {
+    super(`Home Assistant ${path} returned ${status}`);
+  }
+}
+
 function credentials(): HaCredentials {
   const settings = getHomeAssistantSettings(true);
   if (!settings.baseUrl || !settings.token) {
@@ -44,7 +53,7 @@ async function haFetch<T>(path: string): Promise<T> {
     }
   });
   if (!response.ok) {
-    throw new Error(`Home Assistant ${path} returned ${response.status}`);
+    throw new HomeAssistantApiError(path, response.status);
   }
   return (await response.json()) as T;
 }
@@ -58,7 +67,7 @@ async function haFetchText(path: string): Promise<string> {
     }
   });
   if (!response.ok) {
-    throw new Error(`Home Assistant ${path} returned ${response.status}`);
+    throw new HomeAssistantApiError(path, response.status);
   }
   return response.text();
 }
@@ -185,11 +194,12 @@ async function collectOptional<T>(
     return await collect();
   } catch (error) {
     const message = error instanceof Error ? error.message : `Home Assistant ${source} collection failed`;
-    warnings.push(`${source}: ${message}`);
+    const notAvailable = error instanceof HomeAssistantApiError && error.status === 404;
+    warnings.push(notAvailable ? `${source}: not available on this Home Assistant instance` : `${source}: ${message}`);
     addAppLog({
-      level: "warning",
+      level: notAvailable ? "info" : "warning",
       source: "home-assistant",
-      message: `Skipped ${source} diagnostics`,
+      message: notAvailable ? `${source} diagnostics not available` : `Skipped ${source} diagnostics`,
       details: message
     });
     return [];

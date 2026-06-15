@@ -69,4 +69,27 @@ describe("aiSuggestionListSchema", () => {
     ]);
     expect(parsed.suggestions[0].installSteps).toEqual(["Create the automation in Home Assistant."]);
   });
+
+  it("trims oversized evidence and step strings instead of rejecting the whole suggestion", () => {
+    const longEvidence = "sensor.office_motion ".repeat(20);
+    const parsed = aiSuggestionListSchema.parse({
+      suggestions: [
+        {
+          category: "Automation Improvements",
+          title: "Use office motion context",
+          rationale: "The provider supplied useful evidence but made one field too verbose.",
+          confidence: 0.7,
+          effort: "small",
+          risk: "low",
+          evidence: [longEvidence],
+          yaml: "",
+          installSteps: ["Review the automation."],
+          rollbackSteps: ["No changes were made."]
+        }
+      ]
+    });
+
+    expect(parsed.suggestions[0].evidence[0].length).toBeLessThanOrEqual(240);
+    expect(parsed.suggestions[0].evidence[0]).toMatch(/…$/);
+  });
 });
