@@ -227,10 +227,11 @@ label {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
   min-width: 0;
+  overflow: hidden;
 }
 
 .mobile-topbar,
@@ -248,6 +249,7 @@ label {
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-y: auto;
 }
 
 .brand {
@@ -306,6 +308,8 @@ nav button.active {
   animation: page-in 180ms ease both;
   min-width: 0;
   max-width: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 main,
@@ -930,8 +934,11 @@ pre {
 
 @media (max-width: 820px) {
   .app-shell {
+    height: auto;
+    min-height: 100vh;
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    overflow: visible;
   }
 
   .mobile-topbar {
@@ -1008,6 +1015,7 @@ pre {
 
   .content {
     padding: 1rem;
+    overflow-y: visible;
   }
 
   .page-header,
