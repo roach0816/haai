@@ -12,7 +12,7 @@ import type {
 import { createId, decryptSecret, encryptSecret, hmac } from "../crypto.js";
 import { getDb, getSetting, nowIso, setSetting } from "./database.js";
 
-export const defaultAiPromptTemplate = `You are analyzing a Home Assistant installation in read-only mode.
+const legacyDefaultAiPromptTemplate = `You are analyzing a Home Assistant installation in read-only mode.
 Return only valid JSON with this shape: {"suggestions":[...]}.
 Each suggestion must include category, title, rationale, confidence, effort, risk, evidence, yaml, installSteps, rollbackSteps.
 Use only these categories: {{categories}}.
@@ -20,6 +20,11 @@ Limit to {{maxSuggestions}} high-value suggestions.
 Do not invent entity IDs. If YAML is not appropriate, use an empty string and explain UI steps.
 Include copy-paste Home Assistant automation/script YAML when useful.
 Prioritize suggestions that are specific to the provided snapshot over generic maintenance advice.`;
+
+export const defaultAiSuggestionGuidance = `Prefer suggestions that are specific to this Home Assistant installation.
+Prioritize practical automations, reliability improvements, and cleanup items over generic advice.
+Keep recommendations read-only until the user reviews and applies them in Home Assistant.
+When possible, include copy-paste YAML plus clear UI steps.`;
 
 const defaultHaSettings: HomeAssistantSettings & { token?: string } = {
   baseUrl: "",
@@ -37,7 +42,7 @@ const defaultAiSettings: AiSettings & { apiKey?: string } = {
   monthlyBudgetUsd: 20,
   scheduleCron: "0 3 * * *",
   enabled: true,
-  promptTemplate: defaultAiPromptTemplate
+  promptTemplate: defaultAiSuggestionGuidance
 };
 
 const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
@@ -172,9 +177,11 @@ export function getAiSettings(includeKey = false) {
     ...defaultAiSettings,
     ...getSetting<typeof defaultAiSettings>("ai", defaultAiSettings)
   };
+  const promptTemplate = normalizeAiSuggestionGuidance(stored.promptTemplate);
   const apiKey = stored.apiKey ? decryptSecret(stored.apiKey) : "";
   return {
     ...stored,
+    promptTemplate,
     apiKey: includeKey ? apiKey : undefined,
     apiKeyConfigured: Boolean(stored.apiKey)
   };
@@ -194,12 +201,20 @@ export function saveAiSettings(input: {
   const stored = {
     ...current,
     ...input,
-    promptTemplate: input.promptTemplate?.trim() || current.promptTemplate || defaultAiPromptTemplate,
+    promptTemplate: normalizeAiSuggestionGuidance(input.promptTemplate ?? current.promptTemplate),
     apiKey: input.apiKey ? encryptSecret(input.apiKey) : current.apiKey,
     apiKeyConfigured: Boolean(input.apiKey || current.apiKey)
   };
   setSetting("ai", stored);
   return getAiSettings(false);
+}
+
+function normalizeAiSuggestionGuidance(value?: string): string {
+  const guidance = value?.trim();
+  if (!guidance || guidance === legacyDefaultAiPromptTemplate) {
+    return defaultAiSuggestionGuidance;
+  }
+  return guidance;
 }
 
 export function getUpdateSettings(includeToken = false) {

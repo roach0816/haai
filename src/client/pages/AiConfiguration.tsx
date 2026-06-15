@@ -48,8 +48,8 @@ export function AiConfiguration() {
       <section className="page-header">
         <div>
           <p className="eyebrow">AI Configuration</p>
-          <h1>Provider and prompting</h1>
-          <p className="muted">Tune the AI provider, model, limits, schedule, and the prompt used for Home Assistant analysis.</p>
+          <h1>Provider and suggestion guidance</h1>
+          <p className="muted">Tune the AI provider, model, limits, schedule, and the type of suggestions HAAI should prioritize.</p>
         </div>
       </section>
 
@@ -117,7 +117,7 @@ export function AiConfiguration() {
           Enable scheduled analysis
         </label>
         <label>
-          Analysis prompt
+          Suggestion guidance
           <textarea
             className="prompt-editor"
             value={ai.promptTemplate}
@@ -125,7 +125,8 @@ export function AiConfiguration() {
           />
         </label>
         <p className="muted">
-          Available placeholders: <code>{"{{categories}}"}</code> and <code>{"{{maxSuggestions}}"}</code>. The app appends the Home Assistant snapshot after this prompt.
+          This guidance shapes what the AI prioritizes, but HAAI always keeps the required JSON schema,
+          categories, read-only behavior, and Home Assistant evidence rules under application control.
         </p>
         <button>Save AI configuration</button>
       </form>

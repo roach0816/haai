@@ -496,6 +496,27 @@ pre {
   line-height: 1.45;
 }
 
+.yaml-block {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.yaml-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.yaml-block-header h4 {
+  margin: 0;
+}
+
+.yaml-block-header button {
+  flex: 0 0 auto;
+}
+
 .steps {
   display: grid;
   gap: 0.4rem;

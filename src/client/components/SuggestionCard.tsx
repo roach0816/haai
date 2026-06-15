@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Suggestion } from "../../shared/types";
 
 interface Props {
@@ -7,8 +8,14 @@ interface Props {
 }
 
 export function SuggestionCard({ suggestion, onStatus, onRegenerate }: Props) {
+  const [copied, setCopied] = useState(false);
+
   async function copyYaml() {
-    if (suggestion.yaml) await navigator.clipboard.writeText(suggestion.yaml);
+    if (suggestion.yaml) {
+      await navigator.clipboard.writeText(suggestion.yaml);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    }
     onStatus(suggestion.id, "copied");
   }
 
@@ -32,7 +39,19 @@ export function SuggestionCard({ suggestion, onStatus, onRegenerate }: Props) {
           <span key={item}>{item}</span>
         ))}
       </div>
-      {suggestion.yaml ? <pre>{suggestion.yaml}</pre> : <p className="muted">No YAML required for this recommendation.</p>}
+      {suggestion.yaml ? (
+        <section className="yaml-block">
+          <div className="yaml-block-header">
+            <h4>YAML</h4>
+            <button type="button" className="secondary" onClick={copyYaml}>
+              {copied ? "Copied" : "Copy Text"}
+            </button>
+          </div>
+          <pre>{suggestion.yaml}</pre>
+        </section>
+      ) : (
+        <p className="muted">No YAML required for this recommendation.</p>
+      )}
       <div className="steps">
         <h4>Install</h4>
         <ol>

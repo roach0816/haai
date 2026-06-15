@@ -36,7 +36,7 @@ const aiSchema = z.object({
   monthlyBudgetUsd: z.number().min(0).max(10000),
   scheduleCron: z.string().regex(/^\d{1,2}\s+\d{1,2}\s+\*\s+\*\s+\*$/),
   enabled: z.boolean(),
-  promptTemplate: z.string().min(100).max(12000).optional()
+  promptTemplate: z.string().max(4000).optional()
 });
 
 const updateSchema = z.object({
