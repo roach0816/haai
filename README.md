@@ -82,7 +82,8 @@ The installer is intended to feel like a normal Linux application installer. It:
 - creates the `haai` system user,
 - creates `/etc/haai/haai.env`, `/var/lib/haai`, and `/var/log/haai`,
 - installs and verifies systemd services and sudoers permissions,
-- starts the API service and updater timer.
+- starts the API service and updater timer,
+- optionally installs `cloudflared` and registers a Cloudflare Tunnel service.
 
 The installer creates `/etc/haai/haai.env` for bootstrap runtime basics such as host and data directory. Ports are controlled from the web UI unless `HAAI_PORT` is explicitly set in that file. It also installs and verifies:
 
@@ -110,6 +111,27 @@ If you install OS or Node dependencies yourself, skip that part:
 
 ```bash
 sudo HAAI_INSTALL_OS_DEPS=0 ./install.sh
+```
+
+Optional Cloudflare Tunnel install for remote MCP access:
+
+```bash
+sudo HAAI_INSTALL_CLOUDFLARED=1 ./install.sh
+```
+
+To install `cloudflared` and register a tunnel service in one pass, create a remotely-managed Cloudflare Tunnel in the Cloudflare Zero Trust dashboard, copy the tunnel token, then run:
+
+```bash
+read -rsp "Cloudflare tunnel token: " HAAI_TUNNEL_TOKEN
+echo
+sudo HAAI_INSTALL_CLOUDFLARED=1 HAAI_CLOUDFLARED_TOKEN="${HAAI_TUNNEL_TOKEN}" ./install.sh
+unset HAAI_TUNNEL_TOKEN
+```
+
+For a token file instead of an inline environment variable:
+
+```bash
+sudo HAAI_INSTALL_CLOUDFLARED=1 HAAI_CLOUDFLARED_TOKEN_FILE=/path/to/tunnel-token.txt ./install.sh
 ```
 
 Create the local admin user, then go to Settings and configure:
@@ -148,6 +170,27 @@ Let's Encrypt support uses DNS-01 validation with Cloudflare. Create a Cloudflar
 - Zone resources: only the DNS zone for the hostname you will use.
 
 The app creates a temporary TXT record at `_acme-challenge.<hostname>`, waits for DNS propagation, requests the certificate, and then removes the TXT record. The Cloudflare token is encrypted in SQLite and is not returned to the browser after saving.
+
+## Cloudflare Tunnel for OpenAI MCP
+
+OpenAI MCP tools must reach the MCP server over the internet. If your HAAI appliance and `ha-mcp` server are only available on your LAN, use Cloudflare Tunnel instead of opening router ports.
+
+Recommended setup:
+
+1. Run `ha-mcp` on the Pi or another local host.
+2. In Cloudflare Zero Trust, create a Cloudflare Tunnel.
+3. Add a public hostname, for example `ha-mcp.example.com`.
+4. Point the tunnel service to the local MCP server, for example `http://127.0.0.1:8124`.
+5. Install/register `cloudflared` with the optional installer flags above.
+6. In HAAI, go to AI Configuration:
+   - Provider: `OpenAI`.
+   - Enable OpenAI MCP server.
+   - Server label: `ha-mcp`.
+   - Server URL: your public MCP endpoint, for example `https://ha-mcp.example.com/mcp`.
+   - Authorization token: use one if your MCP server expects it.
+   - Allowed tools: prefer a short allowlist of read-only tools.
+
+This does not expose the HAAI web UI unless you explicitly create a tunnel route to HAAI. Keep the tunnel scoped to the MCP endpoint you need OpenAI to call.
 
 ## Home Assistant Access
 

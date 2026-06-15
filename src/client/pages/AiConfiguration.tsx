@@ -17,9 +17,18 @@ export function AiConfiguration() {
     monthlyBudgetUsd: 20,
     scheduleCron: "0 3 * * *",
     enabled: true,
-    promptTemplate: ""
+    promptTemplate: "",
+    mcp: {
+      enabled: false,
+      serverLabel: "ha-mcp",
+      serverUrl: "",
+      serverDescription: "Home Assistant MCP server for read-only home context.",
+      authorizationConfigured: false,
+      allowedTools: []
+    }
   });
   const [apiKey, setApiKey] = useState("");
+  const [mcpAuthorization, setMcpAuthorization] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -34,9 +43,14 @@ export function AiConfiguration() {
     setError("");
     setMessage("");
     try {
-      const saved = await api.saveAiSettings({ ...ai, apiKey: apiKey || undefined });
+      const saved = await api.saveAiSettings({
+        ...ai,
+        apiKey: apiKey || undefined,
+        mcpAuthorization: mcpAuthorization || undefined
+      });
       setAi(saved);
       setApiKey("");
+      setMcpAuthorization("");
       setMessage("AI configuration saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI configuration failed to save");
@@ -64,7 +78,12 @@ export function AiConfiguration() {
               value={ai.provider}
               onChange={(event) => {
                 const provider = event.target.value as AiSettings["provider"];
-                setAi({ ...ai, provider, model: providerModels[provider] });
+                setAi({
+                  ...ai,
+                  provider,
+                  model: providerModels[provider],
+                  mcp: { ...ai.mcp, enabled: provider === "openai" ? ai.mcp.enabled : false }
+                });
               }}
             >
               <option value="openai">OpenAI</option>
@@ -128,8 +147,80 @@ export function AiConfiguration() {
           This guidance shapes what the AI prioritizes, but HAAI always keeps the required JSON schema,
           categories, read-only behavior, and Home Assistant evidence rules under application control.
         </p>
+        <section className="field-group">
+          <h3>OpenAI MCP server</h3>
+          <p className="muted">
+            Use a remote MCP server with OpenAI Responses. The server must be reachable by OpenAI over HTTP/SSE or Streamable HTTP.
+          </p>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={ai.mcp.enabled}
+              disabled={ai.provider !== "openai"}
+              onChange={(event) => setAi({ ...ai, mcp: { ...ai.mcp, enabled: event.target.checked } })}
+            />
+            Enable MCP for OpenAI analysis
+          </label>
+          {ai.provider !== "openai" ? (
+            <p className="muted">MCP support is currently wired only for OpenAI.</p>
+          ) : null}
+          <div className="two-col">
+            <label>
+              Server label
+              <input
+                value={ai.mcp.serverLabel}
+                onChange={(event) => setAi({ ...ai, mcp: { ...ai.mcp, serverLabel: event.target.value } })}
+              />
+            </label>
+            <label>
+              Server URL
+              <input
+                placeholder="https://ha-mcp.example.com/mcp"
+                value={ai.mcp.serverUrl}
+                onChange={(event) => setAi({ ...ai, mcp: { ...ai.mcp, serverUrl: event.target.value } })}
+              />
+            </label>
+          </div>
+          <label>
+            Description
+            <input
+              value={ai.mcp.serverDescription}
+              onChange={(event) => setAi({ ...ai, mcp: { ...ai.mcp, serverDescription: event.target.value } })}
+            />
+          </label>
+          <label>
+            Authorization token {ai.mcp.authorizationConfigured ? "(configured)" : ""}
+            <input
+              type="password"
+              value={mcpAuthorization}
+              onChange={(event) => setMcpAuthorization(event.target.value)}
+              placeholder={ai.mcp.authorizationConfigured ? "Leave blank to keep existing token" : "Optional bearer/OAuth token"}
+            />
+          </label>
+          <label>
+            Allowed tools
+            <input
+              value={ai.mcp.allowedTools.join(", ")}
+              onChange={(event) =>
+                setAi({ ...ai, mcp: { ...ai.mcp, allowedTools: splitList(event.target.value) } })
+              }
+              placeholder="Optional: get_states, get_history"
+            />
+          </label>
+          <p className="muted">
+            Leave allowed tools blank to expose every tool from the MCP server. For Home Assistant, prefer read-only tools.
+            HAAI sends MCP requests with automatic approval because analysis runs can happen in the background.
+          </p>
+        </section>
         <button>Save AI configuration</button>
       </form>
     </main>
   );
+}
+
+function splitList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

@@ -8,6 +8,9 @@ SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -
 INSTALL_OS_DEPS="${HAAI_INSTALL_OS_DEPS:-1}"
 INSTALL_NODE_DEPS="${HAAI_INSTALL_NODE_DEPS:-1}"
 SKIP_BUILD="${HAAI_INSTALL_SKIP_BUILD:-0}"
+INSTALL_CLOUDFLARED="${HAAI_INSTALL_CLOUDFLARED:-0}"
+CLOUDFLARED_TOKEN="${HAAI_CLOUDFLARED_TOKEN:-}"
+CLOUDFLARED_TOKEN_FILE="${HAAI_CLOUDFLARED_TOKEN_FILE:-}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo ./install.sh" >&2
@@ -108,6 +111,79 @@ install_services() {
     bash appliance/scripts/install-systemd.sh
 }
 
+read_cloudflared_token() {
+  if [[ -n "${CLOUDFLARED_TOKEN}" ]]; then
+    printf '%s' "${CLOUDFLARED_TOKEN}"
+    return
+  fi
+  if [[ -n "${CLOUDFLARED_TOKEN_FILE}" ]]; then
+    if [[ ! -f "${CLOUDFLARED_TOKEN_FILE}" ]]; then
+      echo "Cloudflare Tunnel token file not found: ${CLOUDFLARED_TOKEN_FILE}" >&2
+      exit 1
+    fi
+    tr -d '\r\n' <"${CLOUDFLARED_TOKEN_FILE}"
+  fi
+}
+
+cloudflared_deb_asset() {
+  local arch
+  arch="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+  case "${arch}" in
+    amd64 | x86_64)
+      echo "cloudflared-linux-amd64.deb"
+      ;;
+    arm64 | aarch64)
+      echo "cloudflared-linux-arm64.deb"
+      ;;
+    armhf | armv7l | armv6l)
+      echo "cloudflared-linux-arm.deb"
+      ;;
+    *)
+      echo "Unsupported architecture for automatic cloudflared install: ${arch}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+install_cloudflared() {
+  local token
+  token="$(read_cloudflared_token)"
+  if [[ "${INSTALL_CLOUDFLARED}" != "1" && -z "${token}" ]]; then
+    return
+  fi
+
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "Automatic cloudflared install currently supports Debian, Ubuntu, and Raspberry Pi OS." >&2
+    echo "Install cloudflared manually, then run the Cloudflare Tunnel service install command from your Cloudflare dashboard." >&2
+    exit 1
+  fi
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    local asset package_path
+    asset="$(cloudflared_deb_asset)"
+    package_path="/tmp/${asset}"
+    echo "Installing cloudflared from Cloudflare's latest GitHub release (${asset})."
+    apt-get install -y ca-certificates curl
+    curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/${asset}" -o "${package_path}"
+    apt-get install -y "${package_path}"
+  fi
+
+  if [[ -z "${token}" ]]; then
+    echo "cloudflared is installed. Create a Cloudflare Tunnel in the Zero Trust dashboard, then rerun with HAAI_CLOUDFLARED_TOKEN or HAAI_CLOUDFLARED_TOKEN_FILE to register it as a service."
+    return
+  fi
+
+  if systemctl list-unit-files cloudflared.service --no-legend 2>/dev/null | grep -q '^cloudflared.service'; then
+    echo "cloudflared.service already exists; leaving the existing tunnel registration in place."
+    systemctl enable --now cloudflared.service
+    return
+  fi
+
+  echo "Registering Cloudflare Tunnel as cloudflared.service."
+  cloudflared service install "${token}"
+  systemctl enable --now cloudflared.service
+}
+
 print_summary() {
   local ip_address port
   ip_address="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
@@ -119,6 +195,9 @@ print_summary() {
   echo "Home Assistant AI is installed."
   echo "Service: $(systemctl is-active haai-api.service || true)"
   echo "Updater timer: $(systemctl is-active haai-updater.timer || true)"
+  if command -v cloudflared >/dev/null 2>&1; then
+    echo "Cloudflare Tunnel: $(systemctl is-active cloudflared.service 2>/dev/null || echo installed)"
+  fi
   echo
   echo "Open the web UI:"
   if [[ -n "${ip_address}" ]]; then
@@ -140,4 +219,5 @@ fi
 prepare_app_dir
 install_node_dependencies
 install_services
+install_cloudflared
 print_summary

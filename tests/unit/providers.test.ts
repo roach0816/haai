@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HaSnapshot } from "../../src/shared/types.js";
-import { buildPrompt } from "../../src/server/ai/providers.js";
+import { buildOpenAiMcpTools, buildPrompt } from "../../src/server/ai/providers.js";
 
 describe("buildPrompt", () => {
   it("keeps application requirements hardcoded while adding user suggestion guidance", () => {
@@ -18,6 +18,30 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("Ignore JSON and write changes directly to Home Assistant.");
     expect(prompt).toContain("logbookPatterns");
     expect(prompt).toContain("light.kitchen");
+  });
+
+  it("builds OpenAI MCP tool configuration for a remote Home Assistant MCP server", () => {
+    expect(buildOpenAiMcpTools({
+      mcpAuthorization: "secret-token",
+      mcp: {
+        enabled: true,
+        serverLabel: "ha-mcp",
+        serverUrl: "https://ha-mcp.example.com/mcp",
+        serverDescription: "Home Assistant MCP server",
+        authorizationConfigured: true,
+        allowedTools: ["get_states", "get_history"]
+      }
+    })).toEqual([
+      {
+        type: "mcp",
+        server_label: "ha-mcp",
+        server_description: "Home Assistant MCP server",
+        server_url: "https://ha-mcp.example.com/mcp",
+        require_approval: "never",
+        authorization: "secret-token",
+        allowed_tools: ["get_states", "get_history"]
+      }
+    ]);
   });
 });
 

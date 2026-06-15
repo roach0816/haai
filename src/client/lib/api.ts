@@ -59,7 +59,7 @@ export const api = {
       { method: "POST" }
     ),
   getAiSettings: () => request<AiSettings>("/api/settings/ai-provider"),
-  saveAiSettings: (body: Omit<AiSettings, "apiKeyConfigured"> & { apiKey?: string }) =>
+  saveAiSettings: (body: Omit<AiSettings, "apiKeyConfigured"> & { apiKey?: string; mcpAuthorization?: string }) =>
     request<AiSettings>("/api/settings/ai-provider", {
       method: "PUT",
       body: JSON.stringify(body)

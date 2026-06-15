@@ -87,6 +87,14 @@ function emptyDiagnostics(): HaSnapshot["diagnostics"] {
 }
 
 async function callOpenAi(apiKey: string, model: string, prompt: string): Promise<string> {
+  const settings = getAiSettings(true);
+  if (settings.mcp.enabled) {
+    return callOpenAiWithMcp(apiKey, model, prompt, {
+      mcp: settings.mcp,
+      mcpAuthorization: settings.mcpAuthorization
+    });
+  }
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -103,6 +111,88 @@ async function callOpenAi(apiKey: string, model: string, prompt: string): Promis
   if (!response.ok) throw new Error(`OpenAI request failed: ${response.status}`);
   const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   return body.choices?.[0]?.message?.content ?? "";
+}
+
+interface OpenAiMcpSettings {
+  mcp: {
+    enabled: boolean;
+    serverLabel: string;
+    serverUrl: string;
+    serverDescription: string;
+    authorizationConfigured: boolean;
+    allowedTools: string[];
+  };
+  mcpAuthorization?: string;
+}
+
+export function buildOpenAiMcpTools(settings: OpenAiMcpSettings): Array<Record<string, unknown>> {
+  const tool: Record<string, unknown> = {
+    type: "mcp",
+    server_label: settings.mcp.serverLabel,
+    server_description: settings.mcp.serverDescription,
+    server_url: settings.mcp.serverUrl,
+    require_approval: "never"
+  };
+
+  if (settings.mcpAuthorization) {
+    tool.authorization = settings.mcpAuthorization;
+  }
+  if (settings.mcp.allowedTools.length) {
+    tool.allowed_tools = settings.mcp.allowedTools;
+  }
+
+  return [tool];
+}
+
+async function callOpenAiWithMcp(
+  apiKey: string,
+  model: string,
+  prompt: string,
+  settings: OpenAiMcpSettings
+): Promise<string> {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      tools: buildOpenAiMcpTools(settings),
+      input: prompt
+    })
+  });
+  if (!response.ok) throw new Error(`OpenAI MCP request failed: ${response.status}`);
+  const body = (await response.json()) as {
+    output_text?: string;
+    output?: Array<{
+      type?: string;
+      content?: Array<{ type?: string; text?: string }>;
+      error?: string | null;
+      name?: string;
+    }>;
+  };
+  const errors = body.output
+    ?.filter((item) => item.type === "mcp_call" && item.error)
+    .map((item) => `${item.name ?? "mcp_tool"}: ${item.error}`);
+  if (errors?.length) {
+    addAppLog({
+      level: "warning",
+      source: "ai",
+      message: "OpenAI MCP tool call returned errors",
+      details: errors
+    });
+  }
+  return body.output_text ?? extractResponseOutputText(body.output ?? []);
+}
+
+function extractResponseOutputText(output: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>): string {
+  return output
+    .flatMap((item) => item.content ?? [])
+    .map((item) => item.text ?? "")
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function callAnthropic(apiKey: string, model: string, prompt: string): Promise<string> {

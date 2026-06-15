@@ -42,7 +42,15 @@ const defaultAiSettings: AiSettings & { apiKey?: string } = {
   monthlyBudgetUsd: 20,
   scheduleCron: "0 3 * * *",
   enabled: true,
-  promptTemplate: defaultAiSuggestionGuidance
+  promptTemplate: defaultAiSuggestionGuidance,
+  mcp: {
+    enabled: false,
+    serverLabel: "ha-mcp",
+    serverUrl: "",
+    serverDescription: "Home Assistant MCP server for read-only home context.",
+    authorizationConfigured: false,
+    allowedTools: []
+  }
 };
 
 const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
@@ -173,17 +181,20 @@ export function saveHomeAssistantSettings(input: {
 }
 
 export function getAiSettings(includeKey = false) {
-  const stored = {
-    ...defaultAiSettings,
-    ...getSetting<typeof defaultAiSettings>("ai", defaultAiSettings)
-  };
+  const stored = normalizeAiSettings(getSetting<typeof defaultAiSettings>("ai", defaultAiSettings));
   const promptTemplate = normalizeAiSuggestionGuidance(stored.promptTemplate);
   const apiKey = stored.apiKey ? decryptSecret(stored.apiKey) : "";
+  const mcpAuthorization = stored.mcpAuthorization ? decryptSecret(stored.mcpAuthorization) : "";
   return {
     ...stored,
     promptTemplate,
     apiKey: includeKey ? apiKey : undefined,
-    apiKeyConfigured: Boolean(stored.apiKey)
+    mcpAuthorization: includeKey ? mcpAuthorization : undefined,
+    apiKeyConfigured: Boolean(stored.apiKey),
+    mcp: {
+      ...stored.mcp,
+      authorizationConfigured: Boolean(stored.mcpAuthorization)
+    }
   };
 }
 
@@ -191,17 +202,21 @@ export function saveAiSettings(input: {
   provider: AiSettings["provider"];
   model: string;
   apiKey?: string;
+  mcpAuthorization?: string;
   maxTokensPerRun: number;
   monthlyBudgetUsd: number;
   scheduleCron: string;
   enabled: boolean;
   promptTemplate?: string;
+  mcp?: Omit<AiSettings["mcp"], "authorizationConfigured"> & { authorizationConfigured?: boolean };
 }): AiSettings {
-  const current = getSetting<typeof defaultAiSettings>("ai", defaultAiSettings);
+  const current = normalizeAiSettings(getSetting<typeof defaultAiSettings>("ai", defaultAiSettings));
   const stored = {
     ...current,
     ...input,
     promptTemplate: normalizeAiSuggestionGuidance(input.promptTemplate ?? current.promptTemplate),
+    mcp: normalizeMcpSettings(input.mcp ?? current.mcp),
+    mcpAuthorization: input.mcpAuthorization ? encryptSecret(input.mcpAuthorization) : current.mcpAuthorization,
     apiKey: input.apiKey ? encryptSecret(input.apiKey) : current.apiKey,
     apiKeyConfigured: Boolean(input.apiKey || current.apiKey)
   };
@@ -215,6 +230,29 @@ function normalizeAiSuggestionGuidance(value?: string): string {
     return defaultAiSuggestionGuidance;
   }
   return guidance;
+}
+
+function normalizeAiSettings(
+  stored: Partial<typeof defaultAiSettings> & { apiKey?: string; mcpAuthorization?: string }
+): typeof defaultAiSettings & { apiKey?: string; mcpAuthorization?: string } {
+  return {
+    ...defaultAiSettings,
+    ...stored,
+    mcp: normalizeMcpSettings(stored.mcp)
+  };
+}
+
+function normalizeMcpSettings(input?: Partial<AiSettings["mcp"]>): AiSettings["mcp"] {
+  return {
+    ...defaultAiSettings.mcp,
+    ...input,
+    serverLabel: (input?.serverLabel || defaultAiSettings.mcp.serverLabel).trim(),
+    serverUrl: (input?.serverUrl ?? "").trim(),
+    serverDescription: (input?.serverDescription || defaultAiSettings.mcp.serverDescription).trim(),
+    allowedTools: Array.isArray(input?.allowedTools)
+      ? input.allowedTools.map((item) => item.trim()).filter(Boolean)
+      : []
+  };
 }
 
 export function getUpdateSettings(includeToken = false) {

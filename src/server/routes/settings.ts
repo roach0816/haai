@@ -32,11 +32,37 @@ const aiSchema = z.object({
   provider: z.enum(["openai", "anthropic", "gemini"]),
   model: z.string().min(2).max(120),
   apiKey: z.string().optional(),
+  mcpAuthorization: z.string().optional(),
   maxTokensPerRun: z.number().int().min(1000).max(200000),
   monthlyBudgetUsd: z.number().min(0).max(10000),
   scheduleCron: z.string().regex(/^\d{1,2}\s+\d{1,2}\s+\*\s+\*\s+\*$/),
   enabled: z.boolean(),
-  promptTemplate: z.string().max(4000).optional()
+  promptTemplate: z.string().max(4000).optional(),
+  mcp: z.object({
+    enabled: z.boolean(),
+    serverLabel: z.string().min(1).max(80),
+    serverUrl: z.string().max(500),
+    serverDescription: z.string().max(300),
+    authorizationConfigured: z.boolean().optional(),
+    allowedTools: z.array(z.string().min(1).max(120)).max(50)
+  })
+}).superRefine((value, context) => {
+  if (!value.mcp.enabled) return;
+  if (value.provider !== "openai") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["mcp", "enabled"],
+      message: "MCP is currently supported only for OpenAI."
+    });
+  }
+  const parsed = z.string().url().safeParse(value.mcp.serverUrl);
+  if (!parsed.success || !/^https?:\/\//i.test(value.mcp.serverUrl)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["mcp", "serverUrl"],
+      message: "MCP server URL must be a valid HTTP or HTTPS URL."
+    });
+  }
 });
 
 const updateSchema = z.object({

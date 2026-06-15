@@ -28,6 +28,14 @@ export interface AiSettings {
   scheduleCron: string;
   enabled: boolean;
   promptTemplate: string;
+  mcp: {
+    enabled: boolean;
+    serverLabel: string;
+    serverUrl: string;
+    serverDescription: string;
+    authorizationConfigured: boolean;
+    allowedTools: string[];
+  };
 }
 
 export interface UpdateSettings {
