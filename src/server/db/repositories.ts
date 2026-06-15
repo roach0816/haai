@@ -3,6 +3,7 @@ import type {
   AiSettings,
   AnalysisRun,
   AppLog,
+  AppLogPage,
   HaSnapshot,
   HomeAssistantSettings,
   RuntimeSettings,
@@ -515,18 +516,31 @@ export function addAppLog(input: {
   return log;
 }
 
-export function listAppLogs(limit = 100): AppLog[] {
+export function listAppLogs(page = 1, pageSize = 25): AppLogPage {
+  const safePage = Math.max(page, 1);
+  const safePageSize = Math.min(Math.max(pageSize, 1), 50);
+  const offset = (safePage - 1) * safePageSize;
+  const total = Number((getDb().prepare("SELECT COUNT(*) AS total FROM app_logs").get() as { total: number }).total);
   const rows = getDb()
-    .prepare("SELECT * FROM app_logs ORDER BY created_at DESC LIMIT ?")
-    .all(Math.min(Math.max(limit, 1), 300)) as Array<Record<string, unknown>>;
-  return rows.map((row) => ({
+    .prepare("SELECT * FROM app_logs ORDER BY created_at DESC LIMIT ? OFFSET ?")
+    .all(safePageSize, offset) as Array<Record<string, unknown>>;
+  return {
+    items: rows.map(mapAppLog),
+    page: safePage,
+    pageSize: safePageSize,
+    total
+  };
+}
+
+function mapAppLog(row: Record<string, unknown>): AppLog {
+  return {
     id: String(row.id),
     level: row.level as AppLog["level"],
     source: String(row.source),
     message: String(row.message),
     details: row.details ? String(row.details) : undefined,
     createdAt: String(row.created_at)
-  }));
+  };
 }
 
 export function saveSuggestions(runId: string, suggestions: Omit<Suggestion, "id" | "runId" | "status" | "createdAt">[]): Suggestion[] {

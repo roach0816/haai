@@ -62,8 +62,11 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/api/system/logs", { preHandler: requireAuth }, async (request) => {
-    const query = z.object({ limit: z.coerce.number().int().min(1).max(300).optional() }).parse(request.query);
-    return listAppLogs(query.limit ?? 100);
+    const query = z.object({
+      page: z.coerce.number().int().min(1).optional(),
+      pageSize: z.coerce.number().int().min(1).max(50).optional()
+    }).parse(request.query);
+    return listAppLogs(query.page ?? 1, query.pageSize ?? 25);
   });
 
   app.post("/api/system/update", { preHandler: requireAuth }, async (request) => {

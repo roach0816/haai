@@ -4,7 +4,9 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeDb } from "../../src/server/db/database.js";
 import {
+  addAppLog,
   createAnalysisRun,
+  listAppLogs,
   listSuggestions,
   saveSuggestions
 } from "../../src/server/db/repositories.js";
@@ -34,6 +36,23 @@ describe("suggestion repository", () => {
     expect(saveSuggestions(secondRun.id, [suggestion])).toHaveLength(0);
 
     expect(listSuggestions({ status: "new" })).toHaveLength(1);
+  });
+});
+
+describe("app log repository", () => {
+  it("returns paginated log entries with total count", () => {
+    addAppLog({ source: "test", message: "First" });
+    addAppLog({ source: "test", message: "Second" });
+    addAppLog({ source: "test", message: "Third" });
+
+    const firstPage = listAppLogs(1, 2);
+    const secondPage = listAppLogs(2, 2);
+
+    expect(firstPage.total).toBe(3);
+    expect(firstPage.page).toBe(1);
+    expect(firstPage.pageSize).toBe(2);
+    expect(firstPage.items).toHaveLength(2);
+    expect(secondPage.items).toHaveLength(1);
   });
 });
 

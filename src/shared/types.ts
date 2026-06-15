@@ -154,6 +154,13 @@ export interface AppLog {
   createdAt: string;
 }
 
+export interface AppLogPage {
+  items: AppLog[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export interface SystemHealth {
   setupComplete: boolean;
   authenticated: boolean;
