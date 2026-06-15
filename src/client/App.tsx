@@ -46,6 +46,16 @@ export function App() {
     void refresh();
   }, []);
 
+  useEffect(() => {
+    if (!health?.authenticated) return;
+    const interval = window.setInterval(() => {
+      void api.health().then(setHealth).catch(() => {
+        // Keep the last known footer/update state if the API is restarting or temporarily unavailable.
+      });
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [health?.authenticated]);
+
   if (!health) return <main className="loading">Loading Home Assistant AI...</main>;
 
   if (!health.setupComplete || !health.authenticated) {
@@ -54,6 +64,7 @@ export function App() {
 
   return (
     <Layout
+      health={health}
       page={page}
       setPage={setPage}
       onProfile={() => setProfileOpen(true)}

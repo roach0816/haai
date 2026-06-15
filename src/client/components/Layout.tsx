@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
+import type { SystemHealth } from "../../shared/types";
 
 interface Props {
+  health: SystemHealth;
   page: string;
   setPage: (page: string) => void;
   onProfile: () => void;
@@ -8,7 +10,7 @@ interface Props {
   children: ReactNode;
 }
 
-export function Layout({ page, setPage, onProfile, onLogout, children }: Props) {
+export function Layout({ health, page, setPage, onProfile, onLogout, children }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   function navigate(nextPage: string) {
@@ -79,7 +81,39 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
           <button className="ghost" onClick={logout}>Sign out</button>
         </div>
       </aside>
-      <section key={page} className="content">{children}</section>
+      <section key={page} className="content">
+        {children}
+        <AppFooter health={health} />
+      </section>
     </div>
   );
+}
+
+function AppFooter({ health }: { health: SystemHealth }) {
+  const updateState = getFooterUpdateState(health);
+
+  return (
+    <footer className="app-footer">
+      <span>Installed version {health.version}</span>
+      <span className={`status-badge ${updateState.tone}`}>{updateState.label}</span>
+    </footer>
+  );
+}
+
+function getFooterUpdateState(health: SystemHealth): { label: string; tone: "neutral" | "info" | "success" | "warning" | "danger" } {
+  const update = health.update;
+  if (update.status === "checking") return { label: "Checking for updates", tone: "info" };
+  if (update.status === "applying") return { label: "Applying update", tone: "info" };
+  if (update.status === "failed") return { label: "Update check failed", tone: "danger" };
+  if (update.status === "available") return { label: "Update available", tone: "warning" };
+
+  const current = normalizeVersion(update.currentVersion || health.version);
+  const available = normalizeVersion(update.availableVersion || update.currentVersion || health.version);
+  if (current && available && current !== available) return { label: "Update available", tone: "warning" };
+  if (update.checkedAt) return { label: "Up to date", tone: "success" };
+  return { label: "Update status unknown", tone: "neutral" };
+}
+
+function normalizeVersion(version: string): string {
+  return version.trim().replace(/^v/i, "");
 }
