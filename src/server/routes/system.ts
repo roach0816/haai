@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { getConfig } from "../config.js";
 import { getDb, nowIso } from "../db/database.js";
-import { findSessionUser, getRuntimeSettings, hasAdminUser, latestRun } from "../db/repositories.js";
+import { addAppLog, findSessionUser, getRuntimeSettings, hasAdminUser, latestRun, listAppLogs } from "../db/repositories.js";
 import { sessionCookieName, requireAuth } from "../auth.js";
 import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
 import { writeRuntimeConfig } from "../services/runtimeConfig.js";
@@ -61,11 +61,22 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     return getUpdateState();
   });
 
+  app.get("/api/system/logs", { preHandler: requireAuth }, async (request) => {
+    const query = z.object({ limit: z.coerce.number().int().min(1).max(300).optional() }).parse(request.query);
+    return listAppLogs(query.limit ?? 100);
+  });
+
   app.post("/api/system/update", { preHandler: requireAuth }, async (request) => {
     const body = z.object({ action: z.enum(["check", "apply"]) }).parse(request.body);
     if (body.action === "check") {
+      addAppLog({ source: "updates", message: "Update check started" });
       try {
         const check = await runUpdaterCheck();
+        addAppLog({
+          source: "updates",
+          message: check.status === "available" ? "Update available" : "System is up to date",
+          details: check
+        });
         getDb()
           .prepare(
             "UPDATE update_state SET status = ?, current_version = ?, available_version = ?, checked_at = ?, error = NULL WHERE id = 1"
@@ -77,6 +88,12 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
             check.checkedAt ?? nowIso()
           );
       } catch (error) {
+        addAppLog({
+          level: "error",
+          source: "updates",
+          message: "Update check failed",
+          details: error instanceof Error ? error.message : "Update check failed"
+        });
         const failed = readUpdaterStateFile();
         getDb()
           .prepare(
@@ -88,6 +105,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
           );
       }
     } else {
+      addAppLog({ source: "updates", message: "Update apply requested" });
       try {
         markUpdateApplying();
         await triggerApplyUpdate();
@@ -95,6 +113,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
           .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
           .run(nowIso());
       } catch (error) {
+        addAppLog({ level: "error", source: "updates", message: "Update apply failed", details: formatExecError(error) });
         getDb()
           .prepare("UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1")
           .run(nowIso(), formatExecError(error));
@@ -106,7 +125,9 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
     writeRuntimeConfig();
     clearRuntimeRestartRequired();
+    addAppLog({ source: "system", message: "API service restart requested" });
     scheduleApiRestart((error) => {
+      addAppLog({ level: "error", source: "system", message: "API service restart failed", details: error instanceof Error ? error.message : "Restart failed" });
       app.log.error({ err: error }, "Failed to restart API service");
     });
     return reply.code(202).send({ restarting: true });

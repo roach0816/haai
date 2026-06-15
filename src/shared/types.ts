@@ -27,6 +27,7 @@ export interface AiSettings {
   monthlyBudgetUsd: number;
   scheduleCron: string;
   enabled: boolean;
+  promptTemplate: string;
 }
 
 export interface UpdateSettings {
@@ -102,6 +103,15 @@ export interface AnalysisRun {
   summary?: string;
   error?: string;
   suggestionCount: number;
+}
+
+export interface AppLog {
+  id: string;
+  level: "info" | "warning" | "error";
+  source: string;
+  message: string;
+  details?: string;
+  createdAt: string;
 }
 
 export interface SystemHealth {

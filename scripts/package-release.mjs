@@ -30,6 +30,7 @@ const result = spawnSync(
     "package.json",
     "package-lock.json",
     "README.md",
+    "install.sh",
     "dist",
     "appliance"
   ],

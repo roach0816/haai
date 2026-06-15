@@ -3,7 +3,9 @@ import type { SystemHealth } from "../shared/types";
 import { AuthGate } from "./components/AuthGate";
 import { Layout } from "./components/Layout";
 import { ProfileModal } from "./components/ProfileModal";
+import { AiConfiguration } from "./pages/AiConfiguration";
 import { Dashboard } from "./pages/Dashboard";
+import { Logs } from "./pages/Logs";
 import { Settings } from "./pages/Settings";
 import { api } from "./lib/api";
 import {
@@ -61,7 +63,7 @@ export function App() {
         await refresh();
       }}
     >
-      {page === "settings" ? <Settings /> : <Dashboard />}
+      {page === "settings" ? <Settings /> : page === "ai" ? <AiConfiguration /> : page === "logs" ? <Logs /> : <Dashboard />}
       {profileOpen ? (
         <ProfileModal
           appearance={appearance}

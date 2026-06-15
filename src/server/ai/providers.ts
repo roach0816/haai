@@ -1,5 +1,5 @@
 import type { HaSnapshot } from "../../shared/types.js";
-import { getAiSettings } from "../db/repositories.js";
+import { addAppLog, defaultAiPromptTemplate, getAiSettings } from "../db/repositories.js";
 import { aiSuggestionListSchema, type AiSuggestionInput } from "./schema.js";
 
 export interface AnalyzeConstraints {
@@ -16,7 +16,12 @@ export async function analyzeSnapshotWithProvider(
     return [];
   }
 
-  const prompt = buildPrompt(snapshot, constraints);
+  const prompt = buildPrompt(snapshot, constraints, settings.promptTemplate);
+  addAppLog({
+    source: "ai",
+    message: "AI provider request started",
+    details: { provider: settings.provider, model: settings.model }
+  });
   const raw =
     settings.provider === "openai"
       ? await callOpenAi(settings.apiKey, settings.model, prompt)
@@ -26,10 +31,15 @@ export async function analyzeSnapshotWithProvider(
 
   const json = extractJson(raw);
   const parsed = aiSuggestionListSchema.parse(JSON.parse(json));
+  addAppLog({
+    source: "ai",
+    message: "AI provider returned suggestions",
+    details: { provider: settings.provider, model: settings.model, suggestionCount: parsed.suggestions.length }
+  });
   return parsed.suggestions;
 }
 
-function buildPrompt(snapshot: HaSnapshot, constraints: AnalyzeConstraints): string {
+function buildPrompt(snapshot: HaSnapshot, constraints: AnalyzeConstraints, template: string): string {
   const compactSnapshot = {
     capturedAt: snapshot.capturedAt,
     componentCount: snapshot.components.length,
@@ -43,13 +53,11 @@ function buildPrompt(snapshot: HaSnapshot, constraints: AnalyzeConstraints): str
     services: snapshot.services
   };
 
-  return `You are analyzing a Home Assistant installation in read-only mode.
-Return only valid JSON with this shape: {"suggestions":[...]}.
-Each suggestion must include category, title, rationale, confidence, effort, risk, evidence, yaml, installSteps, rollbackSteps.
-Use only these categories: ${constraints.categories.join(", ")}.
-Limit to ${constraints.maxSuggestions} high-value suggestions.
-Do not invent entity IDs. If YAML is not appropriate, use an empty string and explain UI steps.
-Include copy-paste Home Assistant automation/script YAML when useful.
+  const renderedTemplate = (template || defaultAiPromptTemplate)
+    .replaceAll("{{categories}}", constraints.categories.join(", "))
+    .replaceAll("{{maxSuggestions}}", String(constraints.maxSuggestions));
+
+  return `${renderedTemplate}
 
 Snapshot:
 ${JSON.stringify(compactSnapshot, null, 2)}`;

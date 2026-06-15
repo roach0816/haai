@@ -5,6 +5,7 @@ import {
   completeAnalysisRun,
   createAnalysisRun,
   failAnalysisRun,
+  addAppLog,
   saveSnapshot,
   saveSuggestions
 } from "../db/repositories.js";
@@ -23,25 +24,48 @@ export async function runAnalysis(trigger: "manual" | "scheduled" | "regenerate"
 
 async function doRunAnalysis(trigger: "manual" | "scheduled" | "regenerate"): Promise<string> {
   const run = createAnalysisRun(trigger);
+  addAppLog({ source: "analysis", message: `Analysis run started (${trigger})`, details: { runId: run.id } });
   try {
     const snapshot = await collectHomeAssistantSnapshot();
     const snapshotId = saveSnapshot(snapshot);
+    addAppLog({
+      source: "analysis",
+      message: "Home Assistant snapshot captured",
+      details: { runId: run.id, snapshotId, entityCount: snapshot.states.length }
+    });
     const aiSuggestions = await analyzeSnapshotWithProvider(snapshot, {
       categories: suggestionCategories,
       maxSuggestions: 12
     }).catch((error) => {
       console.warn("AI provider failed; falling back to heuristic suggestions", error);
+      addAppLog({
+        level: "warning",
+        source: "ai",
+        message: "AI provider failed; using heuristic suggestions",
+        details: error instanceof Error ? error.message : "Unknown AI provider error"
+      });
       return [];
     });
     const suggestions = mergeSuggestions(aiSuggestions, generateHeuristicSuggestions(snapshot));
-    saveSuggestions(run.id, suggestions);
+    const savedSuggestions = saveSuggestions(run.id, suggestions);
     completeAnalysisRun(
       run.id,
-      `Generated ${suggestions.length} suggestions from ${snapshot.states.length} Home Assistant entities. Snapshot ${snapshotId}.`
+      `Generated ${savedSuggestions.length} suggestions from ${snapshot.states.length} Home Assistant entities. Snapshot ${snapshotId}.`
     );
+    addAppLog({
+      source: "analysis",
+      message: "Analysis run completed",
+      details: { runId: run.id, suggestionCount: savedSuggestions.length }
+    });
     return run.id;
   } catch (error) {
     failAnalysisRun(run.id, error instanceof Error ? error.message : "Unknown analysis error");
+    addAppLog({
+      level: "error",
+      source: "analysis",
+      message: "Analysis run failed",
+      details: error instanceof Error ? error.message : "Unknown analysis error"
+    });
     throw error;
   }
 }

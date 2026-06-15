@@ -78,6 +78,15 @@ export function migrate(database = getDb()): void {
       checked_at TEXT,
       error TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS app_logs (
+      id TEXT PRIMARY KEY,
+      level TEXT NOT NULL,
+      source TEXT NOT NULL,
+      message TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 
   database

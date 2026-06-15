@@ -106,11 +106,24 @@
 body {
   margin: 0;
   background: var(--app-bg);
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -149,13 +162,19 @@ button.ghost {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.72rem 0.8rem;
   background: var(--surface);
   color: var(--text);
+  min-width: 0;
+}
+
+textarea {
+  resize: vertical;
 }
 
 label {
@@ -207,6 +226,7 @@ label {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
+  min-width: 0;
 }
 
 .mobile-topbar,
@@ -280,6 +300,7 @@ nav button.active {
 .content {
   padding: 2rem;
   animation: page-in 180ms ease both;
+  min-width: 0;
 }
 
 .page-header {
@@ -368,7 +389,7 @@ p {
 
 .pillar-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 1rem;
   align-items: start;
 }
@@ -466,6 +487,7 @@ p {
 pre {
   margin: 0;
   overflow: auto;
+  max-width: 100%;
   border-radius: 8px;
   background: var(--code-bg);
   color: var(--code-text);
@@ -627,6 +649,52 @@ pre {
   color: var(--text);
   border: 1px solid var(--border);
   max-height: 280px;
+}
+
+.prompt-editor {
+  min-height: 360px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  line-height: 1.45;
+}
+
+.log-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.log-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px var(--shadow);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.log-entry h3 {
+  margin: 0.6rem 0 0;
+}
+
+.log-entry time {
+  color: var(--text-muted);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.log-warning {
+  border-left-color: #f59e0b;
+}
+
+.log-error {
+  border-left-color: #dc2626;
+}
+
+.log-details {
+  margin-top: 0.75rem;
+  max-height: 240px;
 }
 
 .modal-backdrop {
@@ -873,5 +941,13 @@ pre {
 
   .pillar {
     min-height: auto;
+  }
+
+  .log-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .log-entry time {
+    white-space: normal;
   }
 }

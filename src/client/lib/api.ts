@@ -1,6 +1,7 @@
 import type {
   AiSettings,
   AnalysisRun,
+  AppLog,
   HomeAssistantSettings,
   RuntimeSettings,
   Suggestion,
@@ -63,6 +64,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body)
     }),
+  listLogs: (limit = 100) => request<AppLog[]>(`/api/system/logs?limit=${limit}`),
   getUpdateSettings: () => request<UpdateSettings>("/api/settings/update"),
   saveUpdateSettings: (
     body: Omit<UpdateSettings, "githubTokenConfigured"> & { githubToken?: string }

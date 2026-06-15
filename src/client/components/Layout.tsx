@@ -43,8 +43,7 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
         <div className="brand compact">
           <span className="brand-mark">HA</span>
           <div>
-            <strong>Home AI</strong>
-            <span>Read-only advisor</span>
+            <strong>HAAI</strong>
           </div>
         </div>
       </header>
@@ -58,8 +57,7 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
         <div className="brand">
           <span className="brand-mark">HA</span>
           <div>
-            <strong>Home AI</strong>
-            <span>Read-only advisor</span>
+            <strong>HAAI</strong>
           </div>
         </div>
         <nav>
@@ -68,6 +66,12 @@ export function Layout({ page, setPage, onProfile, onLogout, children }: Props) 
           </button>
           <button className={page === "settings" ? "active" : ""} onClick={() => navigate("settings")}>
             Settings
+          </button>
+          <button className={page === "ai" ? "active" : ""} onClick={() => navigate("ai")}>
+            AI Configuration
+          </button>
+          <button className={page === "logs" ? "active" : ""} onClick={() => navigate("logs")}>
+            Logs
           </button>
         </nav>
         <div className="sidebar-actions">

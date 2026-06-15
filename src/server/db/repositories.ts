@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import type {
   AiSettings,
   AnalysisRun,
+  AppLog,
   HaSnapshot,
   HomeAssistantSettings,
   RuntimeSettings,
@@ -10,6 +11,15 @@ import type {
 } from "../../shared/types.js";
 import { createId, decryptSecret, encryptSecret, hmac } from "../crypto.js";
 import { getDb, getSetting, nowIso, setSetting } from "./database.js";
+
+export const defaultAiPromptTemplate = `You are analyzing a Home Assistant installation in read-only mode.
+Return only valid JSON with this shape: {"suggestions":[...]}.
+Each suggestion must include category, title, rationale, confidence, effort, risk, evidence, yaml, installSteps, rollbackSteps.
+Use only these categories: {{categories}}.
+Limit to {{maxSuggestions}} high-value suggestions.
+Do not invent entity IDs. If YAML is not appropriate, use an empty string and explain UI steps.
+Include copy-paste Home Assistant automation/script YAML when useful.
+Prioritize suggestions that are specific to the provided snapshot over generic maintenance advice.`;
 
 const defaultHaSettings: HomeAssistantSettings & { token?: string } = {
   baseUrl: "",
@@ -26,7 +36,8 @@ const defaultAiSettings: AiSettings & { apiKey?: string } = {
   maxTokensPerRun: 12000,
   monthlyBudgetUsd: 20,
   scheduleCron: "0 3 * * *",
-  enabled: true
+  enabled: true,
+  promptTemplate: defaultAiPromptTemplate
 };
 
 const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
@@ -157,7 +168,10 @@ export function saveHomeAssistantSettings(input: {
 }
 
 export function getAiSettings(includeKey = false) {
-  const stored = getSetting<typeof defaultAiSettings>("ai", defaultAiSettings);
+  const stored = {
+    ...defaultAiSettings,
+    ...getSetting<typeof defaultAiSettings>("ai", defaultAiSettings)
+  };
   const apiKey = stored.apiKey ? decryptSecret(stored.apiKey) : "";
   return {
     ...stored,
@@ -174,11 +188,13 @@ export function saveAiSettings(input: {
   monthlyBudgetUsd: number;
   scheduleCron: string;
   enabled: boolean;
+  promptTemplate?: string;
 }): AiSettings {
   const current = getSetting<typeof defaultAiSettings>("ai", defaultAiSettings);
   const stored = {
     ...current,
     ...input,
+    promptTemplate: input.promptTemplate?.trim() || current.promptTemplate || defaultAiPromptTemplate,
     apiKey: input.apiKey ? encryptSecret(input.apiKey) : current.apiKey,
     apiKeyConfigured: Boolean(input.apiKey || current.apiKey)
   };
@@ -417,6 +433,47 @@ export function listAnalysisRuns(): AnalysisRun[] {
 
 export function latestRun(): AnalysisRun | undefined {
   return listAnalysisRuns()[0];
+}
+
+export function addAppLog(input: {
+  level?: AppLog["level"];
+  source: string;
+  message: string;
+  details?: unknown;
+}): AppLog {
+  const log: AppLog = {
+    id: createId("log"),
+    level: input.level ?? "info",
+    source: input.source,
+    message: input.message,
+    details:
+      input.details === undefined
+        ? undefined
+        : typeof input.details === "string"
+          ? input.details
+          : JSON.stringify(input.details),
+    createdAt: nowIso()
+  };
+  getDb()
+    .prepare(
+      "INSERT INTO app_logs (id, level, source, message, details, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .run(log.id, log.level, log.source, log.message, log.details ?? null, log.createdAt);
+  return log;
+}
+
+export function listAppLogs(limit = 100): AppLog[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM app_logs ORDER BY created_at DESC LIMIT ?")
+    .all(Math.min(Math.max(limit, 1), 300)) as Array<Record<string, unknown>>;
+  return rows.map((row) => ({
+    id: String(row.id),
+    level: row.level as AppLog["level"],
+    source: String(row.source),
+    message: String(row.message),
+    details: row.details ? String(row.details) : undefined,
+    createdAt: String(row.created_at)
+  }));
 }
 
 export function saveSuggestions(runId: string, suggestions: Omit<Suggestion, "id" | "runId" | "status" | "createdAt">[]): Suggestion[] {

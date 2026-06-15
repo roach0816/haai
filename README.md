@@ -64,18 +64,25 @@ The Pi uses this token to read the private repository and download private GitHu
 On the Pi:
 
 ```bash
-sudo apt update
-sudo apt install -y git curl nodejs npm
 sudo mkdir -p /opt/haai
 sudo chown "$USER":"$USER" /opt/haai
 git clone https://github.com/roach0816/haai.git /opt/haai
 cd /opt/haai
-npm install
-npm run build
-sudo ./appliance/scripts/install-systemd.sh
+sudo ./install.sh
 ```
 
 When Git asks for credentials, use your GitHub username and paste the fine-grained token as the password.
+
+The installer is intended to feel like a normal Linux application installer. It:
+
+- installs required Debian/Raspberry Pi OS packages,
+- installs Node.js 22 when the OS Node.js version is missing or too old,
+- installs Node dependencies,
+- builds the React and Fastify app,
+- creates the `haai` system user,
+- creates `/etc/haai/haai.env`, `/var/lib/haai`, and `/var/log/haai`,
+- installs and verifies systemd services and sudoers permissions,
+- starts the API service and updater timer.
 
 The installer creates `/etc/haai/haai.env` for bootstrap runtime basics such as host and data directory. Ports are controlled from the web UI unless `HAAI_PORT` is explicitly set in that file. It also installs and verifies:
 
@@ -91,6 +98,18 @@ Then open:
 
 ```text
 http://<pi-ip>:8787
+```
+
+Advanced install overrides:
+
+```bash
+sudo HAAI_APP_DIR=/opt/haai HAAI_DATA_DIR=/var/lib/haai ./install.sh
+```
+
+If you install OS or Node dependencies yourself, skip that part:
+
+```bash
+sudo HAAI_INSTALL_OS_DEPS=0 ./install.sh
 ```
 
 Create the local admin user, then go to Settings and configure:

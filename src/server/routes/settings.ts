@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "../auth.js";
 import {
   getAiSettings,
+  addAppLog,
   getHomeAssistantSettings,
   getRuntimeSettings,
   getUpdateSettings,
@@ -34,7 +35,8 @@ const aiSchema = z.object({
   maxTokensPerRun: z.number().int().min(1000).max(200000),
   monthlyBudgetUsd: z.number().min(0).max(10000),
   scheduleCron: z.string().regex(/^\d{1,2}\s+\d{1,2}\s+\*\s+\*\s+\*$/),
-  enabled: z.boolean()
+  enabled: z.boolean(),
+  promptTemplate: z.string().min(100).max(12000).optional()
 });
 
 const updateSchema = z.object({
@@ -93,15 +95,18 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     return saved;
   });
 
-  app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () =>
-    startLetsEncryptCertificateRequest()
-  );
+  app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () => {
+    addAppLog({ source: "certificates", message: "Certificate request started" });
+    return startLetsEncryptCertificateRequest();
+  });
 
-  app.post("/api/settings/runtime/certificate/renew", { preHandler: requireAuth }, async () =>
-    startLetsEncryptCertificateRenewal(true)
-  );
+  app.post("/api/settings/runtime/certificate/renew", { preHandler: requireAuth }, async () => {
+    addAppLog({ source: "certificates", message: "Certificate renewal requested" });
+    return startLetsEncryptCertificateRenewal(true);
+  });
 
-  app.post("/api/settings/runtime/certificate/reset", { preHandler: requireAuth }, async () =>
-    resetCertificateRequest()
-  );
+  app.post("/api/settings/runtime/certificate/reset", { preHandler: requireAuth }, async () => {
+    addAppLog({ source: "certificates", message: "Certificate status reset" });
+    return resetCertificateRequest();
+  });
 }

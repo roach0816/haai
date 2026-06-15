@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { suggestionCategories, type AnalysisRun, type Suggestion } from "../../shared/types";
+import { suggestionCategories, type Suggestion } from "../../shared/types";
 import { SuggestionCard } from "../components/SuggestionCard";
 import { api } from "../lib/api";
 
 export function Dashboard() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("new");
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(null);
@@ -16,9 +15,8 @@ export function Dashboard() {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (status !== "all") params.set("status", status);
-    const [nextSuggestions, nextRuns] = await Promise.all([api.listSuggestions(params), api.listRuns()]);
+    const nextSuggestions = await api.listSuggestions(params);
     setSuggestions(nextSuggestions);
-    setRuns(nextRuns);
   }
 
   useEffect(() => {
@@ -106,12 +104,6 @@ export function Dashboard() {
       </section>
 
       {error ? <p className="error">{error}</p> : null}
-
-      <section className="stats-grid">
-        <div className="stat"><strong>{suggestions.length}</strong><span>Visible suggestions</span></div>
-        <div className="stat"><strong>{runs[0]?.status ?? "none"}</strong><span>Latest run</span></div>
-        <div className="stat"><strong>{runs[0]?.suggestionCount ?? 0}</strong><span>Latest count</span></div>
-      </section>
 
       <section className="toolbar">
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
