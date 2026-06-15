@@ -107,10 +107,12 @@ body {
   margin: 0;
   background: var(--app-bg);
   overflow-x: hidden;
+  max-width: 100%;
 }
 
 html {
   overflow-x: hidden;
+  max-width: 100%;
 }
 
 img,
@@ -125,6 +127,7 @@ input,
 select,
 textarea {
   font: inherit;
+  max-width: 100%;
 }
 
 button {
@@ -182,6 +185,7 @@ label {
   gap: 0.45rem;
   color: var(--label);
   font-weight: 700;
+  min-width: 0;
 }
 
 .loading,
@@ -301,6 +305,13 @@ nav button.active {
   padding: 2rem;
   animation: page-in 180ms ease both;
   min-width: 0;
+  max-width: 100%;
+}
+
+main,
+.content > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .page-header {
@@ -309,6 +320,11 @@ nav button.active {
   gap: 1rem;
   align-items: flex-start;
   margin-bottom: 1.5rem;
+  min-width: 0;
+}
+
+.page-header > div {
+  min-width: 0;
 }
 
 h1,
@@ -316,6 +332,7 @@ h2,
 h3,
 p {
   margin-top: 0;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -359,6 +376,7 @@ p {
   padding: 1rem;
   display: grid;
   gap: 0.2rem;
+  min-width: 0;
 }
 
 .stat strong {
@@ -372,6 +390,7 @@ p {
   gap: 0.75rem;
   flex-wrap: wrap;
   align-items: center;
+  min-width: 0;
 }
 
 .toolbar {
@@ -380,6 +399,7 @@ p {
 
 .toolbar select {
   max-width: 320px;
+  min-width: 0;
 }
 
 .suggestion-list {
@@ -404,6 +424,7 @@ p {
   display: grid;
   gap: 1rem;
   align-content: start;
+  min-width: 0;
 }
 
 .pillar header {
@@ -411,6 +432,7 @@ p {
   justify-content: space-between;
   gap: 0.75rem;
   align-items: flex-start;
+  min-width: 0;
 }
 
 .pillar h2 {
@@ -422,6 +444,7 @@ p {
 .pillar-list {
   display: grid;
   gap: 0.65rem;
+  min-width: 0;
 }
 
 .suggestion-summary {
@@ -435,6 +458,7 @@ p {
   gap: 0.4rem;
   border-left-width: 4px;
   box-shadow: none;
+  min-width: 0;
 }
 
 .suggestion-summary span {
@@ -457,6 +481,7 @@ p {
   padding: 1rem;
   display: grid;
   gap: 0.9rem;
+  min-width: 0;
 }
 
 .suggestion header,
@@ -482,6 +507,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 pre {
@@ -530,6 +556,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  min-width: 0;
 }
 
 .panel {
@@ -537,6 +564,7 @@ pre {
   display: grid;
   gap: 1rem;
   align-content: start;
+  min-width: 0;
 }
 
 .panel-heading {
@@ -556,6 +584,9 @@ pre {
   font-size: 0.78rem;
   font-weight: 900;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-badge.neutral {
@@ -681,6 +712,7 @@ pre {
 .log-list {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .log-entry {
@@ -693,6 +725,13 @@ pre {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   padding: 1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.log-entry > div {
+  min-width: 0;
 }
 
 .log-entry h3 {
@@ -716,6 +755,9 @@ pre {
 .log-details {
   margin-top: 0.75rem;
   max-height: 240px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .modal-backdrop {
@@ -767,6 +809,7 @@ pre {
   padding: 0.9rem;
   display: grid;
   gap: 0.85rem;
+  min-width: 0;
 }
 
 .field-group h3 {
@@ -836,6 +879,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  min-width: 0;
 }
 
 .check-row {
