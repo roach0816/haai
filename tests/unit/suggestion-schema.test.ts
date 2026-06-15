@@ -43,4 +43,30 @@ describe("aiSuggestionListSchema", () => {
       })
     ).toThrow();
   });
+
+  it("normalizes common AI provider formatting mistakes", () => {
+    const parsed = aiSuggestionListSchema.parse({
+      suggestions: [
+        {
+          category: "Automation Opportunities",
+          title: "Coordinate office lights",
+          rationale: "The office has related motion and lighting entities that can work together.",
+          confidence: "82%",
+          effort: "low",
+          risk: "low",
+          evidence: "binary_sensor.office_motion and light.office are in the same area",
+          yaml: "alias: Office lights",
+          installSteps: "Create the automation in Home Assistant.",
+          rollbackSteps: "Delete the automation."
+        }
+      ]
+    });
+
+    expect(parsed.suggestions[0].confidence).toBe(0.82);
+    expect(parsed.suggestions[0].effort).toBe("small");
+    expect(parsed.suggestions[0].evidence).toEqual([
+      "binary_sensor.office_motion and light.office are in the same area"
+    ]);
+    expect(parsed.suggestions[0].installSteps).toEqual(["Create the automation in Home Assistant."]);
+  });
 });
