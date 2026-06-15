@@ -12,6 +12,29 @@ export function generateHeuristicSuggestions(snapshot: HaSnapshot): AiSuggestion
   );
   const lights = snapshot.states.filter((state) => state.entity_id.startsWith("light."));
   const disabledAutomations = snapshot.automationStates.filter((state) => state.state === "off");
+  const repeatedErrors = (snapshot.diagnostics?.errorLogPatterns ?? []).filter((pattern) => pattern.count > 1);
+
+  if (repeatedErrors.length) {
+    suggestions.push({
+      category: "Reliability & Safety",
+      title: "Investigate repeated Home Assistant log errors",
+      rationale:
+        "Repeated Home Assistant errors or warnings often point to integrations, devices, or automations that need attention before new automations depend on them.",
+      confidence: 0.88,
+      effort: "medium",
+      risk: "low",
+      evidence: repeatedErrors
+        .slice(0, 6)
+        .map((pattern) => `${pattern.source}: ${pattern.message} (${pattern.count} times)`),
+      yaml: "",
+      installSteps: [
+        "Open Home Assistant Settings > System > Logs and review the repeated messages.",
+        "Check the integration or entity named in each message.",
+        "Repair the source issue before building new automations that depend on affected devices."
+      ],
+      rollbackSteps: ["No automation change is required; this is a diagnostic recommendation."]
+    });
+  }
 
   if (motionSensors.length && lights.length) {
     suggestions.push({

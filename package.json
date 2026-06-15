@@ -1,6 +1,6 @@
 {
   "name": "haai",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "private": true,
   "type": "module",
   "description": "Home Assistant AI appliance for read-only automation insights.",

@@ -70,11 +70,43 @@ export interface HaSnapshot {
   services: unknown[];
   components: string[];
   automationStates: HaState[];
+  diagnostics: {
+    errorLogPatterns: HaErrorLogPattern[];
+    logbookPatterns: HaLogbookPattern[];
+    historyPatterns: HaHistoryPattern[];
+    collectionWarnings: string[];
+  };
   health: {
     unavailableCount: number;
     unknownCount: number;
     batteryLowCount: number;
   };
+}
+
+export interface HaErrorLogPattern {
+  source: string;
+  message: string;
+  count: number;
+  severity: "warning" | "error";
+}
+
+export interface HaLogbookPattern {
+  entityId?: string;
+  domain?: string;
+  name?: string;
+  message: string;
+  count: number;
+  firstSeen?: string;
+  lastSeen?: string;
+}
+
+export interface HaHistoryPattern {
+  entityId: string;
+  changeCount: number;
+  unavailableCount: number;
+  states: string[];
+  firstChanged?: string;
+  lastChanged?: string;
 }
 
 export interface Suggestion {

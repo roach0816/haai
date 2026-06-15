@@ -50,7 +50,8 @@ export function buildPrompt(snapshot: HaSnapshot, constraints: AnalyzeConstraint
     notableStates: snapshot.states
       .filter((state) => ["unavailable", "unknown"].includes(state.state) || state.entity_id.includes("battery"))
       .slice(0, 120),
-    services: snapshot.services
+    services: snapshot.services,
+    diagnostics: snapshot.diagnostics ?? emptyDiagnostics()
   };
 
   const guidance = suggestionGuidance.trim() || defaultAiSuggestionGuidance;
@@ -74,6 +75,15 @@ ${guidance}
 
 Snapshot:
 ${JSON.stringify(compactSnapshot, null, 2)}`;
+}
+
+function emptyDiagnostics(): HaSnapshot["diagnostics"] {
+  return {
+    errorLogPatterns: [],
+    logbookPatterns: [],
+    historyPatterns: [],
+    collectionWarnings: []
+  };
 }
 
 async function callOpenAi(apiKey: string, model: string, prompt: string): Promise<string> {
