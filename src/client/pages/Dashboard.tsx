@@ -128,7 +128,6 @@ export function Dashboard() {
               <header>
                 <div>
                   <h2>{item}</h2>
-                  <p className="muted">{categorySuggestions.length} suggestion{categorySuggestions.length === 1 ? "" : "s"}</p>
                 </div>
                 <span className="status-badge neutral">{counts.get(item) ?? 0}</span>
               </header>
