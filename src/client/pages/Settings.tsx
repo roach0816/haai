@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type {
   HomeAssistantSettings,
   RuntimeSettings,
@@ -45,7 +45,6 @@ export function Settings() {
   const [certificateRequesting, setCertificateRequesting] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [updateSettingsOpen, setUpdateSettingsOpen] = useState(false);
-  const autoUpdateCheckStarted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,10 +61,6 @@ export function Settings() {
         setUpdate(updateSettings);
         setRuntime(runtimeSettings);
         setHealth(healthState);
-        if (!autoUpdateCheckStarted.current && updateSettingsReady(updateSettings)) {
-          autoUpdateCheckStarted.current = true;
-          void runUpdateCheck({ showMessage: false });
-        }
       }
     );
 
