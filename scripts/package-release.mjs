@@ -30,6 +30,9 @@ const result = spawnSync(
     "package.json",
     "package-lock.json",
     "README.md",
+    "Dockerfile",
+    ".dockerignore",
+    "compose.yml",
     "install.sh",
     "dist",
     "appliance"

@@ -1,0 +1,13 @@
+.git
+.github
+.data
+dist
+node_modules
+release
+
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+.DS_Store
+npm-debug.log*

@@ -13,7 +13,12 @@ Home Assistant AI is a read-only advisor for a Home Assistant instance. It runs 
 - AI provider adapters for OpenAI, Anthropic, and Gemini.
 - Heuristic fallback suggestions when no AI key is configured or a provider call fails.
 - Manual analysis runs and a simple daily cron scheduler.
-- systemd unit files and updater scaffolding for Raspberry Pi OS Lite.
+- Raspberry Pi OS Lite systemd units and container image publishing for deployment.
+
+## Deployment Options
+
+- Raspberry Pi appliance: use the installer in this repo. This is the appliance-style path with systemd services and the in-app updater.
+- Container: use the GitHub Container Registry image. This is the Docker/Kubernetes path with persistent `/data` storage and image-based updates.
 
 ## Development
 
@@ -150,6 +155,245 @@ Create the local admin user, then go to Settings and configure:
   - GitHub repo: `haai`
   - GitHub token: the fine-grained token with `Contents: Read-only`
 
+## Container Deployment
+
+HAAI can run as a container. The container image is published to GitHub Container Registry when a `v*` release tag is pushed.
+
+Container deployments should use persistent storage and image-based updates. Do not use the Raspberry Pi `install.sh` systemd installer inside a container.
+
+### Login to GitHub Container Registry
+
+The package is private while this project is private. Create a GitHub personal access token with `read:packages`, then log in:
+
+```bash
+docker login ghcr.io
+```
+
+Use your GitHub username and paste the token as the password. You can skip this step later if the image is public.
+
+### Pull the Docker image
+
+This command pulls the latest published image:
+
+```bash
+docker pull ghcr.io/roach0816/haai:latest
+```
+
+To run a specific version:
+
+```bash
+docker pull ghcr.io/roach0816/haai:0.0.39
+```
+
+### Create persistent data storage
+
+The image stores SQLite data, encrypted secrets, runtime configuration, certificates, update metadata, logs, and local history in `/data`.
+
+Using a named Docker volume is the easiest option:
+
+```bash
+docker volume create haai-data
+```
+
+If you prefer a bind mount, create a host directory and ensure the container can write to it:
+
+```bash
+mkdir -p /opt/haai-data
+```
+
+### Create and run the container
+
+Use the following command to create and run HAAI:
+
+```bash
+docker run --name haai \
+  --restart unless-stopped \
+  -v haai-data:/data \
+  -e HAAI_HOST=0.0.0.0 \
+  -e HAAI_PORT=8787 \
+  -e HAAI_DATA_DIR=/data \
+  -e HAAI_RESTART_MODE=direct \
+  -p 8787:8787/tcp \
+  -d ghcr.io/roach0816/haai:latest
+```
+
+Then open:
+
+```text
+http://<docker-host>:8787
+```
+
+Do not forget to use persistent storage. If `/data` is not persisted, HAAI will lose setup state, encrypted keys, history, certificates, and settings when the container is removed.
+
+### Port mappings you may need
+
+- `-p 8787:8787/tcp`: default HAAI web UI and API.
+- `-p 80:8787/tcp`: expose HAAI on standard HTTP while keeping the container on port `8787`.
+- `-p 443:8787/tcp`: only use this behind a TLS-terminating proxy or if you explicitly configure HTTPS behavior for your environment.
+
+For containers, it is usually cleaner to keep HAAI listening on `8787` internally and expose `80`/`443` through Docker port mapping, a reverse proxy, Cloudflare Tunnel, or Kubernetes Ingress.
+
+### Control the container
+
+```bash
+docker start haai
+docker stop haai
+docker restart haai
+docker logs -f haai
+docker rm haai
+```
+
+### Update to a newer version
+
+Container deployments should update by replacing the image, not by using the appliance/systemd updater.
+
+```bash
+docker pull ghcr.io/roach0816/haai:latest
+docker stop haai
+docker rm haai
+docker run --name haai \
+  --restart unless-stopped \
+  -v haai-data:/data \
+  -e HAAI_HOST=0.0.0.0 \
+  -e HAAI_PORT=8787 \
+  -e HAAI_DATA_DIR=/data \
+  -e HAAI_RESTART_MODE=direct \
+  -p 8787:8787/tcp \
+  -d ghcr.io/roach0816/haai:latest
+```
+
+The named `haai-data` volume preserves your app state across container replacement.
+
+### Running pre-release builds
+
+Every GitHub release tag publishes a matching container tag. To run a specific pre-release build, replace `latest` with the version:
+
+```bash
+docker run --name haai \
+  --restart unless-stopped \
+  -v haai-data:/data \
+  -e HAAI_HOST=0.0.0.0 \
+  -e HAAI_PORT=8787 \
+  -e HAAI_DATA_DIR=/data \
+  -e HAAI_RESTART_MODE=direct \
+  -p 8787:8787/tcp \
+  -d ghcr.io/roach0816/haai:0.0.39
+```
+
+### Docker Compose
+
+This repository includes `compose.yml`. Start it with:
+
+```bash
+docker compose up -d
+```
+
+The compose file uses:
+
+```yaml
+services:
+  haai:
+    image: ghcr.io/roach0816/haai:latest
+    container_name: haai
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      HAAI_HOST: 0.0.0.0
+      HAAI_PORT: "8787"
+      HAAI_DATA_DIR: /data
+      HAAI_RESTART_MODE: direct
+    volumes:
+      - haai-data:/data
+
+volumes:
+  haai-data:
+```
+
+Update with:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### Kubernetes
+
+Use a persistent volume claim for `/data`, run the app on container port `8787`, and expose it with a Service plus Ingress.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: haai-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haai
+  template:
+    metadata:
+      labels:
+        app: haai
+    spec:
+      containers:
+        - name: haai
+          image: ghcr.io/roach0816/haai:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8787
+          env:
+            - name: HAAI_HOST
+              value: "0.0.0.0"
+            - name: HAAI_PORT
+              value: "8787"
+            - name: HAAI_DATA_DIR
+              value: /data
+            - name: HAAI_RESTART_MODE
+              value: direct
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: haai-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haai
+spec:
+  selector:
+    app: haai
+  ports:
+    - name: http
+      port: 8787
+      targetPort: 8787
+```
+
+Ingress should terminate TLS and route to the `haai` Service on port `8787`. If your GHCR image is private, configure an `imagePullSecret` for GitHub Container Registry.
+
+### Additional container configuration
+
+- `HAAI_DATA_DIR=/data` is required for persistent state.
+- `HAAI_PORT=8787` pins the container listener to the documented internal port.
+- `HAAI_RESTART_MODE=direct` makes the GUI restart button exit the Node process; Docker or Kubernetes restart policy starts it again.
+- Leave the appliance update source unconfigured in container deployments unless you specifically want read-only update checks. Do not use the GUI Apply update button for containers.
+- Let's Encrypt DNS-01 can work in a container if `/data` is persistent.
+- Cloudflare Tunnel should run as a separate container or Kubernetes sidecar, not through the Raspberry Pi systemd installer.
+
 ## Ports and TLS
 
 The app defaults to port `8787` because ports below `1024` usually require extra Linux privileges. The systemd service grants ambient `CAP_NET_BIND_SERVICE`, which allows the non-root `haai` user to bind ports such as `80` and `443` without running the app as root. The service intentionally does not narrow `CapabilityBoundingSet`, because the GUI updater and restart controls use a tightly scoped sudoers rule to start root-owned systemd units.
@@ -242,7 +486,10 @@ The workflow will:
 - run tests,
 - build the app,
 - package `release/haai-0.0.1.tgz`,
-- upload the tarball and `.sha256` checksum to the GitHub Release.
+- upload the tarball and `.sha256` checksum to the GitHub Release,
+- build and push multi-architecture container images to GitHub Container Registry:
+  - `ghcr.io/roach0816/haai:<version>`
+  - `ghcr.io/roach0816/haai:latest`
 
 The app checks GitHub in two ways:
 
@@ -260,6 +507,8 @@ If an update fails after the backup is created, the updater attempts to restore 
 ```bash
 sudo /opt/haai/appliance/scripts/haai-update rollback
 ```
+
+For container deployments, use the Docker or Kubernetes image redeploy flow instead of the GUI Apply update button. The appliance updater is designed for the Raspberry Pi systemd install.
 
 If Network & TLS settings save but the active listener does not change, check for an old explicit port override:
 

@@ -1,0 +1,17 @@
+services:
+  haai:
+    image: ghcr.io/roach0816/haai:latest
+    container_name: haai
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      HAAI_HOST: 0.0.0.0
+      HAAI_PORT: "8787"
+      HAAI_DATA_DIR: /data
+      HAAI_RESTART_MODE: direct
+    volumes:
+      - haai-data:/data
+
+volumes:
+  haai-data:
