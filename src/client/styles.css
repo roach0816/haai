@@ -598,6 +598,17 @@ pre {
   color: var(--text-muted);
 }
 
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 2.1rem;
+  max-width: none;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .status-badge.info {
   background: #e0f2fe;
   color: #075985;

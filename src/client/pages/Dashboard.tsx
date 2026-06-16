@@ -129,7 +129,7 @@ export function Dashboard() {
                 <div>
                   <h2>{item}</h2>
                 </div>
-                <span className="status-badge neutral">{counts.get(item) ?? 0}</span>
+                <span className="status-badge neutral count-badge">{counts.get(item) ?? 0}</span>
               </header>
               <div className="pillar-list">
                 {categorySuggestions.length ? categorySuggestions.map((suggestion) => (
