@@ -20,51 +20,18 @@ Home Assistant AI is a read-only advisor for a Home Assistant instance. It runs 
 - Raspberry Pi appliance: use the installer in this repo. This is the appliance-style path with systemd services and the in-app updater.
 - Container: use the GitHub Container Registry image. This is the Docker/Kubernetes path with persistent `/data` storage and image-based updates.
 
-## Development
-
-```bash
-npm install
-npm run dev
-```
-
-Open the UI at `http://localhost:5173`. The API listens on `http://localhost:8787` by default.
-
-For local data:
-
-```bash
-export HAAI_DATA_DIR="$PWD/.data"
-```
-
-## Production Build
-
-```bash
-npm run build
-npm start
-```
-
-The production server serves the built React app and API from the same port.
-
-## Initial Raspberry Pi Deployment
+## Raspberry Pi Appliance Deployment
 
 The appliance target is Raspberry Pi OS Lite 64-bit on a Pi 4 or Pi 5.
 
-### 1. Create the private GitHub repo
+Prerequisites:
 
-Create a private GitHub repository and push this code to it.
+- Raspberry Pi OS Lite 64-bit.
+- Git access to the HAAI repository or release source.
+- A GitHub token or deploy key if the repository is private.
+- A Home Assistant Long-Lived Access Token for first-run setup.
 
-For the initial pre-release, use release tag `v0.0.1`. Versioning follows standard semantic version positions: major releases use the first digit (`1.x.x`), minor releases use the second digit (`x.1.x`), and pre-release/early iteration builds use patch versions such as `0.0.1` and `0.0.2`.
-
-### 2. Create a read-only GitHub token
-
-Create a fine-grained personal access token for the Pi:
-
-- Repository access: only this private repository.
-- Repository permissions: `Contents: Read-only`.
-- Expiration: your choice; for a home appliance, a long expiration is simpler, but a shorter one is safer.
-
-The Pi uses this token to read the private repository and download private GitHub Release assets.
-
-### 3. Clone and install on the Pi
+### Clone and install
 
 On the Pi:
 
@@ -76,7 +43,7 @@ cd /opt/haai
 sudo ./install.sh
 ```
 
-When Git asks for credentials, use your GitHub username and paste the fine-grained token as the password.
+If the repository is private and Git asks for credentials, use your GitHub username and paste a token with repository read access as the password. A deploy key also works for SSH-based clones.
 
 The installer is intended to feel like a normal Linux application installer. It:
 
@@ -97,8 +64,6 @@ The installer creates `/etc/haai/haai.env` for bootstrap runtime basics such as 
 - `haai-updater.timer`
 - `haai-apply-update.service`
 - `/etc/sudoers.d/haai-updater`
-
-GitHub update settings are configured in the web UI after first login, not in the env file.
 
 Then open:
 
@@ -150,10 +115,10 @@ Create the local admin user, then go to Settings and configure:
   - DNS provider: `Cloudflare`.
   - Cloudflare token for Let's Encrypt DNS validation.
 - Appliance update source:
-  - Source: `Private GitHub release`
+  - Source: `Private GitHub release` if releases are private.
   - GitHub owner: `roach0816`
   - GitHub repo: `haai`
-  - GitHub token: the fine-grained token with `Contents: Read-only`
+  - GitHub token: a token with release asset read access.
 
 ## Container Deployment
 
@@ -182,7 +147,7 @@ docker pull ghcr.io/roach0816/haai:latest
 To run a specific version:
 
 ```bash
-docker pull ghcr.io/roach0816/haai:0.0.39
+docker pull ghcr.io/roach0816/haai:<version>
 ```
 
 ### Create persistent data storage
@@ -277,7 +242,7 @@ docker run --name haai \
   -e HAAI_DATA_DIR=/data \
   -e HAAI_RESTART_MODE=direct \
   -p 8787:8787/tcp \
-  -d ghcr.io/roach0816/haai:0.0.39
+  -d ghcr.io/roach0816/haai:<version>
 ```
 
 ### Docker Compose
@@ -455,54 +420,19 @@ Collected data is minimized before AI analysis:
 
 Every suggestion includes rationale, evidence, confidence, effort, risk, install steps, rollback steps, and YAML when appropriate.
 
-## GitHub Release Updates
+## Appliance Updates
 
-All deployment and updates should roll through the private GitHub repository.
+Raspberry Pi appliance deployments can check for and apply updates from the web UI.
 
-For manual local packaging:
-
-```bash
-npm run release:package -- --version-label=0.0.1
-```
-
-This creates:
-
-```text
-release/haai-0.0.1.tgz
-release/haai-0.0.1.tgz.sha256
-```
-
-For normal releases, use the GitHub Actions workflow:
-
-```bash
-git tag v0.0.1
-git push origin v0.0.1
-```
-
-The workflow will:
-
-- install dependencies,
-- typecheck,
-- run tests,
-- build the app,
-- package `release/haai-0.0.1.tgz`,
-- upload the tarball and `.sha256` checksum to the GitHub Release,
-- build and push multi-architecture container images to GitHub Container Registry:
-  - `ghcr.io/roach0816/haai:<version>`
-  - `ghcr.io/roach0816/haai:latest`
-
-The app checks GitHub in two ways:
-
-- Manual: Settings > Updates > Check for updates.
-- Periodic: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
+- Manual check: Settings > Updates > Check for updates.
+- Manual apply: Settings > Updates > Apply update.
+- Automatic check: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
 
 The GitHub owner, repo, and token are stored from the web UI. The token is encrypted in SQLite and materialized into `/var/lib/haai/updater-config.json` for the privileged updater service.
 
-The GUI Apply update button starts `haai-apply-update.service`, which runs as root through a narrow sudoers rule for the `haai` service user. The updater reads the latest GitHub Release, downloads the `haai-<version>.tgz` asset, verifies SHA-256 using GitHub's asset digest or the uploaded `.sha256` file, backs up `/opt/haai`, replaces the app files, installs production dependencies, and restarts `haai-api.service`.
+The appliance updater downloads the latest GitHub Release asset, verifies SHA-256, backs up `/opt/haai`, replaces the app files, installs production dependencies, reapplies service metadata, and restarts `haai-api.service`.
 
-The updater also reapplies the appliance service metadata from the release, including systemd units, sudoers rules, and the default env-file migration. This is required for settings such as port changes, TLS on `443`, and GUI-triggered service restarts to work after an app update.
-
-If an update fails after the backup is created, the updater attempts to restore the previous app bundle. Manual rollback is also available:
+If an appliance update fails after the backup is created, the updater attempts to restore the previous app bundle. Manual rollback is also available:
 
 ```bash
 sudo /opt/haai/appliance/scripts/haai-update rollback
@@ -521,3 +451,24 @@ If needed, remove or comment `HAAI_PORT=8787`, then restart from the GUI or run:
 ```bash
 sudo systemctl restart haai-api.service
 ```
+
+## Local Development
+
+For local development:
+
+```bash
+npm install
+export HAAI_DATA_DIR="$PWD/.data"
+npm run dev
+```
+
+Open the UI at `http://localhost:5173`. The API listens on `http://localhost:8787` by default.
+
+For a production-style local run:
+
+```bash
+npm run build
+npm start
+```
+
+Maintainer release and versioning workflow is documented in `AGENTS.md`.
