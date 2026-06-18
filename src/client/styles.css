@@ -884,6 +884,25 @@ pre {
   margin-bottom: 0;
 }
 
+.feature-notice {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.feature-notice strong,
+.feature-notice p {
+  margin: 0;
+}
+
+.feature-notice p {
+  color: var(--text-muted);
+}
+
 .check-row {
   display: flex;
   align-items: center;

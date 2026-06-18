@@ -154,7 +154,17 @@ export function AiConfiguration() {
           categories, read-only behavior, and Home Assistant evidence rules under application control.
         </p>
         <section className="field-group">
-          <h3>OpenAI MCP server</h3>
+          <div className="panel-heading">
+            <h3>OpenAI MCP server</h3>
+            <span className="status-badge warning">Beta</span>
+          </div>
+          <div className="feature-notice" role="note">
+            <strong>Beta feature</strong>
+            <p>
+              OpenAI MCP server support is currently in beta and may not work in every environment. It is expected to
+              be fully functional in a later release.
+            </p>
+          </div>
           <p className="muted">
             Use a remote MCP server with OpenAI Responses. The server must be reachable by OpenAI over HTTP/SSE or Streamable HTTP.
           </p>
