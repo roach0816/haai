@@ -2,7 +2,7 @@ name: haai
 
 services:
   haai:
-    image: ghcr.io/roach0816/haai:0.0.41
+    image: ghcr.io/roach0816/haai:0.0.42
     container_name: haai
     restart: unless-stopped
     init: true
