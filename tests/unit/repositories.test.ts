@@ -6,6 +6,7 @@ import { closeDb } from "../../src/server/db/database.js";
 import {
   addAppLog,
   createAnalysisRun,
+  getUpdateSettings,
   listAppLogs,
   listSuggestions,
   saveSuggestions
@@ -53,6 +54,17 @@ describe("app log repository", () => {
     expect(firstPage.pageSize).toBe(2);
     expect(firstPage.items).toHaveLength(2);
     expect(secondPage.items).toHaveLength(1);
+  });
+});
+
+describe("update settings repository", () => {
+  it("defaults to the public HAAI GitHub release source without requiring a token", () => {
+    expect(getUpdateSettings()).toMatchObject({
+      source: "github",
+      githubOwner: "roach0816",
+      githubRepo: "haai",
+      githubTokenConfigured: false
+    });
   });
 });
 

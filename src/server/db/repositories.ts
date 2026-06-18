@@ -56,8 +56,8 @@ const defaultAiSettings: AiSettings & { apiKey?: string } = {
 
 const defaultUpdateSettings: UpdateSettings & { githubToken?: string } = {
   source: "github",
-  githubOwner: "",
-  githubRepo: "",
+  githubOwner: "roach0816",
+  githubRepo: "haai",
   githubTokenConfigured: false,
   manifestUrl: ""
 };

@@ -276,20 +276,20 @@ async function readReleaseMetadata(): Promise<{
 }
 
 async function readGitHubReleaseMetadata(owner: string, repo: string, token: string) {
-  if (!owner || !repo || !token) {
-    throw new Error("GitHub owner, repo, and token are required for update checks");
+  if (!owner || !repo) {
+    throw new Error("GitHub owner and repo are required for update checks");
   }
+
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "haai-updater"
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(
     `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases?per_page=30`,
-    {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "haai-updater"
-      }
-    }
+    { headers }
   );
   if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
 

@@ -18,8 +18,8 @@ export function Settings() {
   const [haToken, setHaToken] = useState("");
   const [update, setUpdate] = useState<UpdateSettings>({
     source: "github",
-    githubOwner: "",
-    githubRepo: "",
+    githubOwner: "roach0816",
+    githubRepo: "haai",
     githubTokenConfigured: false,
     manifestUrl: ""
   });
@@ -607,7 +607,7 @@ function splitList(value: string): string[] {
 
 function updateSettingsReady(settings: UpdateSettings): boolean {
   if (settings.source === "github") {
-    return Boolean(settings.githubOwner && settings.githubRepo && settings.githubTokenConfigured);
+    return Boolean(settings.githubOwner && settings.githubRepo);
   }
   return Boolean(settings.manifestUrl);
 }
@@ -826,12 +826,12 @@ function UpdateSettingsModal({
               </label>
             </div>
             <label>
-              GitHub token {update.githubTokenConfigured ? "(configured)" : ""}
+              GitHub token {update.githubTokenConfigured ? "(configured)" : "(optional for public releases)"}
               <input
                 type="password"
                 value={githubToken}
                 onChange={(event) => setGithubToken(event.target.value)}
-                placeholder={update.githubTokenConfigured ? "Leave blank to keep existing token" : "Paste fine-grained token"}
+                placeholder={update.githubTokenConfigured ? "Leave blank to keep existing token" : "Only needed for private releases"}
               />
             </label>
           </>

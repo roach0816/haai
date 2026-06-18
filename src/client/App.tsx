@@ -132,7 +132,7 @@ export function App() {
 
 function updateSettingsReady(settings: UpdateSettings): boolean {
   if (settings.source === "github") {
-    return Boolean(settings.githubOwner && settings.githubRepo && settings.githubTokenConfigured);
+    return Boolean(settings.githubOwner && settings.githubRepo);
   }
   return Boolean(settings.manifestUrl);
 }
