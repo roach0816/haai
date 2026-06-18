@@ -61,9 +61,14 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  app.get("/api/system/update", { preHandler: requireAuth }, async () => {
-    return getUpdateState();
-  });
+  app.get(
+    "/api/system/update",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+    },
+    async () => getUpdateState()
+  );
 
   app.get("/api/system/logs", { preHandler: requireAuth }, async (request) => {
     const query = z.object({
@@ -73,84 +78,91 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     return listAppLogs(query.page ?? 1, query.pageSize ?? 25);
   });
 
-  app.post("/api/system/update", { preHandler: requireAuth }, async (request) => {
-    const body = z.object({ action: z.enum(["check", "apply"]) }).parse(request.body);
-    if (body.action === "check") {
-      addAppLog({ source: "updates", message: "Update check started" });
-      try {
-        const check = await runUpdaterCheck();
-        writeUpdaterStateFile(check);
-        addAppLog({
-          source: "updates",
-          message: check.status === "available" ? "Update available" : "System is up to date",
-          details: check
-        });
-        getDb()
-          .prepare(
-            "UPDATE update_state SET status = ?, current_version = ?, available_version = ?, checked_at = ?, error = NULL WHERE id = 1"
-          )
-          .run(
-            check.status,
-            check.currentVersion,
-            check.availableVersion ?? null,
-            check.checkedAt ?? nowIso()
-          );
-      } catch (error) {
-        addAppLog({
-          level: "error",
-          source: "updates",
-          message: "Update check failed",
-          details: error instanceof Error ? error.message : "Update check failed"
-        });
-        const failed = readUpdaterStateFile();
-        getDb()
-          .prepare(
-            "UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1"
-          )
-          .run(
-            failed?.checkedAt ?? nowIso(),
-            failed?.error ?? (error instanceof Error ? error.message : "Update check failed")
-          );
-      }
-    } else {
-      addAppLog({ source: "updates", message: "Update apply requested" });
-      try {
-        if (!deploymentInfo().updateApplySupported) {
-          const current = getUpdateState();
-          const checkedAt = nowIso();
-          const instructions = updateInstructions(String(current.available_version ?? ""));
-          writeUpdaterStateFile({
-            status: current.available_version ? "available" : "idle",
-            checkedAt,
-            currentVersion: String(current.current_version ?? getConfig().version),
-            availableVersion: current.available_version ? String(current.available_version) : undefined,
-            releaseUrl: current.release_url ? String(current.release_url) : undefined,
-            releaseNotes: current.release_notes ? String(current.release_notes) : undefined,
-            archiveName: current.archive_name ? String(current.archive_name) : undefined,
-            updateInstructions: instructions,
-            progress: current.progress ? JSON.parse(String(current.progress)) : undefined
-          });
+  app.post(
+    "/api/system/update",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 10, timeWindow: "10 minutes" } }
+    },
+    async (request) => {
+      const body = z.object({ action: z.enum(["check", "apply"]) }).parse(request.body);
+      if (body.action === "check") {
+        addAppLog({ source: "updates", message: "Update check started" });
+        try {
+          const check = await runUpdaterCheck();
+          writeUpdaterStateFile(check);
           addAppLog({
             source: "updates",
-            message: "Container update apply skipped",
-            details: "Container deployments update by pulling a new image or upgrading the Helm chart."
+            message: check.status === "available" ? "Update available" : "System is up to date",
+            details: check
           });
-          return getUpdateState();
+          getDb()
+            .prepare(
+              "UPDATE update_state SET status = ?, current_version = ?, available_version = ?, checked_at = ?, error = NULL WHERE id = 1"
+            )
+            .run(
+              check.status,
+              check.currentVersion,
+              check.availableVersion ?? null,
+              check.checkedAt ?? nowIso()
+            );
+        } catch (error) {
+          addAppLog({
+            level: "error",
+            source: "updates",
+            message: "Update check failed",
+            details: error instanceof Error ? error.message : "Update check failed"
+          });
+          const failed = readUpdaterStateFile();
+          getDb()
+            .prepare(
+              "UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1"
+            )
+            .run(
+              failed?.checkedAt ?? nowIso(),
+              failed?.error ?? (error instanceof Error ? error.message : "Update check failed")
+            );
         }
-        markUpdateApplying();
-        await triggerApplyUpdate();
-        getDb()
-          .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
-          .run(nowIso());
-      } catch (error) {
-        addAppLog({ level: "error", source: "updates", message: "Update apply failed", details: formatExecError(error) });
-        getDb()
-          .prepare("UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1")
-          .run(nowIso(), formatExecError(error));
+      } else {
+        addAppLog({ source: "updates", message: "Update apply requested" });
+        try {
+          if (!deploymentInfo().updateApplySupported) {
+            const current = getUpdateState();
+            const checkedAt = nowIso();
+            const instructions = updateInstructions(String(current.available_version ?? ""));
+            writeUpdaterStateFile({
+              status: current.available_version ? "available" : "idle",
+              checkedAt,
+              currentVersion: String(current.current_version ?? getConfig().version),
+              availableVersion: current.available_version ? String(current.available_version) : undefined,
+              releaseUrl: current.release_url ? String(current.release_url) : undefined,
+              releaseNotes: current.release_notes ? String(current.release_notes) : undefined,
+              archiveName: current.archive_name ? String(current.archive_name) : undefined,
+              updateInstructions: instructions,
+              progress: current.progress ? JSON.parse(String(current.progress)) : undefined
+            });
+            addAppLog({
+              source: "updates",
+              message: "Container update apply skipped",
+              details: "Container deployments update by pulling a new image or upgrading the Helm chart."
+            });
+            return getUpdateState();
+          }
+          markUpdateApplying();
+          await triggerApplyUpdate();
+          getDb()
+            .prepare("UPDATE update_state SET status = 'applying', checked_at = ?, error = NULL WHERE id = 1")
+            .run(nowIso());
+        } catch (error) {
+          addAppLog({ level: "error", source: "updates", message: "Update apply failed", details: formatExecError(error) });
+          getDb()
+            .prepare("UPDATE update_state SET status = 'failed', checked_at = ?, error = ? WHERE id = 1")
+            .run(nowIso(), formatExecError(error));
+        }
       }
+      return getUpdateState();
     }
-    return getUpdateState();
-  });
+  );
 
   app.post("/api/system/restart", { preHandler: requireAuth }, async (_request, reply) => {
     writeRuntimeConfig();

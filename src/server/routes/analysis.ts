@@ -9,12 +9,26 @@ import {
 import { runAnalysis } from "../services/analysis.js";
 
 export async function analysisRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/api/analysis-runs", { preHandler: requireAuth }, async (_request, reply) => {
-    const runId = await runAnalysis("manual");
-    return reply.code(202).send({ runId });
-  });
+  app.post(
+    "/api/analysis-runs",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: "10 minutes" } }
+    },
+    async (_request, reply) => {
+      const runId = await runAnalysis("manual");
+      return reply.code(202).send({ runId });
+    }
+  );
 
-  app.get("/api/analysis-runs", { preHandler: requireAuth }, async () => listAnalysisRuns());
+  app.get(
+    "/api/analysis-runs",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+    },
+    async () => listAnalysisRuns()
+  );
 
   app.get("/api/suggestions", { preHandler: requireAuth }, async (request) => {
     const query = z
@@ -31,8 +45,15 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     return suggestion;
   });
 
-  app.post("/api/suggestions/:id/regenerate", { preHandler: requireAuth }, async (_request, reply) => {
-    const runId = await runAnalysis("regenerate");
-    return reply.code(202).send({ runId });
-  });
+  app.post(
+    "/api/suggestions/:id/regenerate",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: "10 minutes" } }
+    },
+    async (_request, reply) => {
+      const runId = await runAnalysis("regenerate");
+      return reply.code(202).send({ runId });
+    }
+  );
 }

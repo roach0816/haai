@@ -121,18 +121,39 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     return saved;
   });
 
-  app.post("/api/settings/runtime/certificate", { preHandler: requireAuth }, async () => {
-    addAppLog({ source: "certificates", message: "Certificate request started" });
-    return startLetsEncryptCertificateRequest();
-  });
+  app.post(
+    "/api/settings/runtime/certificate",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: "1 hour" } }
+    },
+    async () => {
+      addAppLog({ source: "certificates", message: "Certificate request started" });
+      return startLetsEncryptCertificateRequest();
+    }
+  );
 
-  app.post("/api/settings/runtime/certificate/renew", { preHandler: requireAuth }, async () => {
-    addAppLog({ source: "certificates", message: "Certificate renewal requested" });
-    return startLetsEncryptCertificateRenewal(true);
-  });
+  app.post(
+    "/api/settings/runtime/certificate/renew",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: "1 hour" } }
+    },
+    async () => {
+      addAppLog({ source: "certificates", message: "Certificate renewal requested" });
+      return startLetsEncryptCertificateRenewal(true);
+    }
+  );
 
-  app.post("/api/settings/runtime/certificate/reset", { preHandler: requireAuth }, async () => {
-    addAppLog({ source: "certificates", message: "Certificate status reset" });
-    return resetCertificateRequest();
-  });
+  app.post(
+    "/api/settings/runtime/certificate/reset",
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 10, timeWindow: "15 minutes" } }
+    },
+    async () => {
+      addAppLog({ source: "certificates", message: "Certificate status reset" });
+      return resetCertificateRequest();
+    }
+  );
 }
