@@ -39,3 +39,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "haai.image" -}}
 {{- printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) -}}
 {{- end -}}
+
+{{- define "haai.podSecurityContext" -}}
+{{- $context := deepCopy (.Values.podSecurityContext | default dict) -}}
+{{- $seccomp := get $context "seccompProfile" -}}
+{{- if and (kindIs "map" $seccomp) (not (get $seccomp "type")) -}}
+{{- $_ := unset $context "seccompProfile" -}}
+{{- end -}}
+{{- toYaml $context -}}
+{{- end -}}
