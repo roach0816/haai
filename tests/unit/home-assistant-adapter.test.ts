@@ -10,8 +10,8 @@ import type { HaState } from "../../src/shared/types.js";
 describe("Home Assistant diagnostics summarizers", () => {
   it("summarizes and redacts repeated error log patterns", () => {
     const patterns = summarizeErrorLog(`
-2026-06-15 08:00:00 homeassistant.components.demo: Failed request to http://192.168.1.10/api?token=secret
-2026-06-15 08:01:00 homeassistant.components.demo: Failed request to http://192.168.1.10/api?token=secret
+2026-06-15 08:00:00 homeassistant.components.demo: Failed request to http://192.0.2.10/api?token=secret
+2026-06-15 08:01:00 homeassistant.components.demo: Failed request to http://192.0.2.10/api?token=secret
     `);
 
     expect(patterns).toHaveLength(1);
@@ -21,7 +21,7 @@ describe("Home Assistant diagnostics summarizers", () => {
       severity: "error"
     });
     expect(patterns[0].message).toContain("[url]");
-    expect(patterns[0].message).not.toContain("192.168.1.10");
+    expect(patterns[0].message).not.toContain("192.0.2.10");
     expect(patterns[0].message).not.toContain("secret");
   });
 

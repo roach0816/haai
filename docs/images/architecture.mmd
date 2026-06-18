@@ -1,0 +1,20 @@
+flowchart LR
+  user[User]
+  proxy[Optional reverse proxy, Ingress, Gateway, or Tunnel]
+  route[Docker port mapping or Kubernetes Service]
+  app[HAAI application container]
+  data[(Persistent /data storage)]
+
+  user --> proxy
+  proxy --> route
+  route --> app
+  app --> data
+
+  subgraph Kubernetes
+    ingress[Optional Ingress or Gateway]
+    service[Kubernetes Service]
+    pod[Application Pod]
+    pvc[(PersistentVolumeClaim)]
+    storage[User-selected StorageClass]
+    ingress --> service --> pod --> pvc --> storage
+  end

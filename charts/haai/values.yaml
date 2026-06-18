@@ -1,0 +1,90 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/roach0816/haai
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+  existingClaim: ""
+
+config:
+  HAAI_HOST: "0.0.0.0"
+  HAAI_PORT: "8787"
+  HAAI_DATA_DIR: /data
+  HAAI_RESTART_MODE: direct
+  HAAI_UPDATE_APPLY_MODE: direct
+
+existingSecret: ""
+secretMount:
+  enabled: true
+  mountPath: /run/secrets/haai
+  appSecretKey: haai-secret
+
+resources:
+  requests: {}
+  limits: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  startup:
+    enabled: true
+    failureThreshold: 30
+    periodSeconds: 5
+  readiness:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 30
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+topologySpreadConstraints: []
+affinity: {}
+tolerations: []
+nodeSelector: {}

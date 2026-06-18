@@ -1,0 +1,13 @@
+apiVersion: v2
+name: haai
+description: Home Assistant AI read-only automation advisor
+type: application
+version: 0.0.41
+appVersion: "0.0.41"
+keywords:
+  - home-assistant
+  - automation
+  - ai
+home: https://github.com/roach0816/haai
+sources:
+  - https://github.com/roach0816/haai

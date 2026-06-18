@@ -1,0 +1,12 @@
+HAAI has been installed.
+
+Internal service:
+  {{ include "haai.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+HAAI stores SQLite state in {{ .Values.persistence.mountPath }} and supports one active replica.
+
+If Ingress is disabled, test locally with:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "haai.fullname" . }} 8787:{{ .Values.service.port }}
+
+Then open:
+  http://127.0.0.1:8787

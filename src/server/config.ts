@@ -50,6 +50,18 @@ export function getConfig(): RuntimeConfig {
   };
 }
 
+export function readOptionalSecret(name: string): string | undefined {
+  const fileName = `${name}_FILE`;
+  const filePath = process.env[fileName];
+  if (filePath) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`${fileName} points to a missing file`);
+    }
+    return fs.readFileSync(filePath, "utf8").replace(/\r?\n$/, "");
+  }
+  return process.env[name];
+}
+
 function readRuntimeConfig(dataDir: string): {
   httpPort: number;
   httpsPort: number;

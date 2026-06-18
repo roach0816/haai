@@ -1,0 +1,33 @@
+name: haai
+
+services:
+  haai:
+    image: ghcr.io/roach0816/haai:0.0.41
+    container_name: haai
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${HAAI_HTTP_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      HAAI_HOST: 0.0.0.0
+      HAAI_PORT: "8787"
+      HAAI_DATA_DIR: /data
+      HAAI_RESTART_MODE: direct
+      HAAI_UPDATE_APPLY_MODE: direct
+    volumes:
+      - haai-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/api/system/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
+
+volumes:
+  haai-data:

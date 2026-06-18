@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { getConfig } from "./config.js";
+import { getConfig, readOptionalSecret } from "./config.js";
 
 const algorithm = "aes-256-gcm";
 
 export function getAppSecret(): Buffer {
   const config = getConfig();
-  if (process.env.HAAI_SECRET) {
-    return crypto.createHash("sha256").update(process.env.HAAI_SECRET).digest();
+  const configuredSecret = readOptionalSecret("HAAI_SECRET");
+  if (configuredSecret) {
+    return crypto.createHash("sha256").update(configuredSecret).digest();
   }
 
   if (!fs.existsSync(config.secretPath)) {

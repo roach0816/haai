@@ -22,6 +22,17 @@ RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
 
+ARG VERSION=0.0.0
+ARG REVISION=unknown
+ARG SOURCE=https://github.com/roach0816/haai
+
+LABEL org.opencontainers.image.title="Home Assistant AI" \
+  org.opencontainers.image.description="Read-only Home Assistant automation advisor" \
+  org.opencontainers.image.source="${SOURCE}" \
+  org.opencontainers.image.version="${VERSION}" \
+  org.opencontainers.image.revision="${REVISION}" \
+  org.opencontainers.image.licenses="UNLICENSED"
+
 ENV NODE_ENV=production \
   HAAI_HOST=0.0.0.0 \
   HAAI_PORT=8787 \

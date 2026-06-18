@@ -4,6 +4,12 @@
 dist
 node_modules
 release
+deploy/private
+docker/secrets/*
+!docker/secrets/.gitkeep
+.env
+.env.*
+!.env.example
 
 *.sqlite
 *.sqlite-shm

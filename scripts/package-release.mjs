@@ -32,10 +32,16 @@ const result = spawnSync(
     "README.md",
     "Dockerfile",
     ".dockerignore",
-    "compose.yml",
+    "compose.yaml",
+    "compose.build.yaml",
+    ".env.example",
     "install.sh",
     "dist",
-    "appliance"
+    "appliance",
+    "charts",
+    "deploy/examples",
+    "docker",
+    "docs"
   ],
   { cwd: root, stdio: "inherit" }
 );
