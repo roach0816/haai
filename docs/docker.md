@@ -63,7 +63,7 @@ docker compose pull
 docker compose up -d --remove-orphans
 ```
 
-The HAAI Updates card checks the public GitHub release source and shows release notes and Docker instructions. Container updates cannot be applied from inside HAAI.
+HAAI checks the public GitHub release source once an hour. The Updates card shows release notes and Docker instructions. Container updates cannot be applied from inside HAAI.
 
 Use immutable version tags for stable deployments. `latest` is convenient for testing but should not be the only production pin.
 

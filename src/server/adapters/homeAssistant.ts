@@ -15,6 +15,15 @@ interface HaCredentials {
   excludedEntities: string[];
 }
 
+interface RawSystemLogEntry {
+  name?: string;
+  message?: string | string[];
+  level?: string;
+  source?: [string, number];
+  exception?: string;
+  count?: number;
+}
+
 export interface ConnectionTestResult {
   rest: boolean;
   websocket: boolean;
@@ -70,6 +79,59 @@ async function haFetchText(path: string): Promise<string> {
     throw new HomeAssistantApiError(path, response.status);
   }
   return response.text();
+}
+
+async function haWebSocketCommand<T>(type: string): Promise<T> {
+  const { baseUrl, token } = credentials();
+  const wsUrl = baseUrl.replace(/^http/i, "ws") + "/api/websocket";
+
+  return new Promise<T>((resolve, reject) => {
+    const socket = new WebSocket(wsUrl);
+    let settled = false;
+    const timer = setTimeout(() => finish(new Error(`Home Assistant WebSocket ${type} timed out`)), 10_000);
+
+    function finish(error?: Error, result?: T) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.close();
+      if (error) reject(error);
+      else resolve(result as T);
+    }
+
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString()) as {
+        id?: number;
+        type: string;
+        success?: boolean;
+        result?: T;
+        error?: { code?: string; message?: string };
+      };
+      if (message.type === "auth_required") {
+        socket.send(JSON.stringify({ type: "auth", access_token: token }));
+        return;
+      }
+      if (message.type === "auth_ok") {
+        socket.send(JSON.stringify({ id: 1, type }));
+        return;
+      }
+      if (message.type === "auth_invalid") {
+        finish(new Error("Home Assistant WebSocket authentication failed"));
+        return;
+      }
+      if (message.type === "result" && message.id === 1) {
+        if (message.success) finish(undefined, message.result);
+        else {
+          const detail = message.error?.message ?? message.error?.code ?? "command failed";
+          finish(new Error(`Home Assistant WebSocket ${type} failed: ${detail}`));
+        }
+      }
+    });
+    socket.on("error", (error) => finish(error));
+    socket.on("close", () => {
+      if (!settled) finish(new Error(`Home Assistant WebSocket ${type} closed before responding`));
+    });
+  });
 }
 
 export async function testHomeAssistantConnection(): Promise<ConnectionTestResult> {
@@ -164,7 +226,7 @@ async function collectDiagnostics(states: HaState[]): Promise<HaSnapshot["diagno
   const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [errorLogPatterns, logbookPatterns, historyPatterns] = await Promise.all([
-    collectOptional("error_log", collectionWarnings, async () => summarizeErrorLog(await haFetchText("/api/error_log"))),
+    collectOptional("error_log", collectionWarnings, collectErrorLogPatterns),
     collectOptional("logbook", collectionWarnings, async () =>
       summarizeLogbook(
         await haFetch<RawLogbookEntry[]>(
@@ -183,6 +245,15 @@ async function collectDiagnostics(states: HaState[]): Promise<HaSnapshot["diagno
     historyPatterns,
     collectionWarnings
   };
+}
+
+async function collectErrorLogPatterns(): Promise<HaErrorLogPattern[]> {
+  try {
+    return summarizeErrorLog(await haFetchText("/api/error_log"));
+  } catch (error) {
+    if (!(error instanceof HomeAssistantApiError) || error.status !== 404) throw error;
+    return summarizeSystemLog(await haWebSocketCommand<RawSystemLogEntry[]>("system_log/list"));
+  }
 }
 
 async function collectOptional<T>(
@@ -221,6 +292,30 @@ export function summarizeErrorLog(raw: string): HaErrorLogPattern[] {
   }
   return [...patterns.values()]
     .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+}
+
+export function summarizeSystemLog(entries: RawSystemLogEntry[]): HaErrorLogPattern[] {
+  return entries
+    .map((entry) => {
+      const messages = Array.isArray(entry.message) ? entry.message : [entry.message ?? ""];
+      const message = redactSensitiveText(messages.filter(Boolean).join(" | ")).trim();
+      const exception = redactSensitiveText(entry.exception ?? "").trim();
+      const combined = [message, exception].filter(Boolean).join(" | ").slice(0, 280);
+      if (!combined) return null;
+
+      const source = redactSensitiveText(
+        entry.name ?? entry.source?.[0] ?? "homeassistant"
+      ).slice(0, 140);
+      return {
+        source,
+        message: combined,
+        count: Math.max(1, Number(entry.count) || 1),
+        severity: /warn/i.test(entry.level ?? "") ? "warning" as const : "error" as const
+      };
+    })
+    .filter((entry): entry is HaErrorLogPattern => Boolean(entry))
+    .sort((left, right) => right.count - left.count)
     .slice(0, 12);
 }
 

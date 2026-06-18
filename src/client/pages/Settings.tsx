@@ -505,6 +505,7 @@ export function Settings() {
             </div>
           </div>
           <p>Updater: {updateChecking ? "checking" : health?.update.status ?? "idle"}</p>
+          <p className="muted">HAAI checks for new releases automatically once an hour.</p>
           {health?.update.checkedAt ? (
             <p className="muted">Last checked: {new Date(health.update.checkedAt).toLocaleString()}</p>
           ) : (

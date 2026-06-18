@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/server/app.js";
 import { closeDb } from "../../src/server/db/database.js";
+import { checkForUpdatesIfDue } from "../../src/server/services/updateCheck.js";
 
 let dataDir = "";
 
@@ -62,5 +63,27 @@ describe("system update routes", () => {
     expect((init as RequestInit).headers).not.toHaveProperty("Authorization");
 
     await app.close();
+  });
+
+  it("checks once when the hourly update interval is due", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            draft: false,
+            prerelease: false,
+            tag_name: "v1.0.8",
+            html_url: "https://github.com/roach0816/haai/releases/tag/v1.0.8",
+            body: "Next release",
+            assets: [{ name: "haai-1.0.8.tgz" }]
+          }
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    expect(await checkForUpdatesIfDue(60 * 60 * 1000)).toBe(true);
+    expect(await checkForUpdatesIfDue(60 * 60 * 1000)).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

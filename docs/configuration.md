@@ -17,7 +17,7 @@ Basic installs require no exported shell variables and no `.env` file. Docker Co
 
 ## Container Behavior
 
-Container deployments expose application settings but do not expose in-app listener, certificate, restart, or update-apply controls. Manage external ports, TLS, restarts, and upgrades with Docker, Rancher/Kubernetes, an Ingress, Gateway, reverse proxy, load balancer, or Cloudflare Tunnel. The Updates card can check the public GitHub release source and provide deployment-specific instructions.
+Container deployments expose application settings but do not expose in-app listener, certificate, restart, or update-apply controls. Manage external ports, TLS, restarts, and upgrades with Docker, Rancher/Kubernetes, an Ingress, Gateway, reverse proxy, load balancer, or Cloudflare Tunnel. HAAI checks the public GitHub release source once an hour, and the Updates card provides deployment-specific instructions.
 
 `HAAI_RESTART_MODE` and `HAAI_UPDATE_APPLY_MODE` remain internal compatibility settings in existing deployment files. They do not enable appliance-style controls in container mode and should not be used as a container update mechanism.
 

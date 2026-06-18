@@ -68,7 +68,7 @@ helm upgrade haai oci://ghcr.io/roach0816/charts/haai \
   --namespace haai
 ```
 
-The HAAI Updates card can check the public GitHub release source and show the latest version, but Kubernetes deployments can only apply updates by upgrading the Helm release in Rancher or Helm.
+HAAI checks the public GitHub release source once an hour and shows the latest version in the Updates card. Kubernetes deployments can only apply updates by upgrading the Helm release in Rancher or Helm.
 
 Rollback uses Helm release history, but database migrations may not be reversible. Restore a matching PVC backup if a rollback crosses an incompatible migration.
 

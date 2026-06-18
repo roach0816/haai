@@ -3,7 +3,8 @@ import {
   selectHistoryEntities,
   summarizeErrorLog,
   summarizeHistory,
-  summarizeLogbook
+  summarizeLogbook,
+  summarizeSystemLog
 } from "../../src/server/adapters/homeAssistant.js";
 import type { HaState } from "../../src/shared/types.js";
 
@@ -54,6 +55,35 @@ describe("Home Assistant diagnostics summarizers", () => {
         lastSeen: "2026-06-14T11:00:00Z"
       }
     ]);
+  });
+
+  it("summarizes current Home Assistant WebSocket system logs", () => {
+    const patterns = summarizeSystemLog([
+      {
+        name: "homeassistant.components.demo",
+        message: ["Request failed for http://192.0.2.10/api?token=secret"],
+        level: "ERROR",
+        source: ["homeassistant/components/demo/__init__.py", 42],
+        exception: "ConnectionError: unavailable",
+        count: 4
+      },
+      {
+        name: "custom_components.example",
+        message: ["Configuration is deprecated"],
+        level: "WARNING",
+        count: 2
+      }
+    ]);
+
+    expect(patterns).toHaveLength(2);
+    expect(patterns[0]).toMatchObject({
+      source: "homeassistant.components.demo",
+      count: 4,
+      severity: "error"
+    });
+    expect(patterns[0].message).toContain("[url]");
+    expect(patterns[0].message).not.toContain("secret");
+    expect(patterns[1].severity).toBe("warning");
   });
 
   it("summarizes frequent history changes and unavailable states", () => {

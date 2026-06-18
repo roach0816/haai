@@ -1,7 +1,9 @@
 import { getAiSettings } from "../db/repositories.js";
 import { runAnalysis } from "./analysis.js";
 import { startLetsEncryptCertificateRenewal } from "./certificates.js";
+import { checkForUpdatesIfDue } from "./updateCheck.js";
 
+const updateCheckIntervalMs = 60 * 60 * 1000;
 let timer: NodeJS.Timeout | undefined;
 let lastRunKey = "";
 let lastCertificateRenewalCheckKey = "";
@@ -18,6 +20,9 @@ export function stopScheduler(): void {
 }
 
 async function checkSchedule(): Promise<void> {
+  await checkForUpdatesIfDue(updateCheckIntervalMs).catch((error) =>
+    console.error("Scheduled update check failed", error)
+  );
   await checkCertificateRenewal();
 
   const settings = getAiSettings(false);

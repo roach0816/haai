@@ -233,9 +233,10 @@ Every suggestion includes rationale, evidence, confidence, effort, risk, install
 
 Raspberry Pi appliance deployments can check for and apply updates from the web UI.
 
+- Automatic check: HAAI checks for new releases once an hour while the API service is running.
 - Manual check: Settings > Updates > Check for updates.
 - Manual apply: Settings > Updates > Apply update.
-- Automatic check: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
+- Fallback check: `haai-updater.timer` runs daily and writes `/var/lib/haai/update-check.json`.
 
 The GitHub owner, repo, and token are stored from the web UI. The token is encrypted in SQLite and materialized into `/var/lib/haai/updater-config.json` for the privileged updater service.
 

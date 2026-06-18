@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { SystemHealth, UpdateSettings } from "../shared/types";
+import { useEffect, useState } from "react";
+import type { SystemHealth } from "../shared/types";
 import { AuthGate } from "./components/AuthGate";
 import { Layout } from "./components/Layout";
 import { ProfileModal } from "./components/ProfileModal";
@@ -16,7 +16,6 @@ import {
 } from "./lib/appearance";
 
 const healthRefreshMs = 60_000;
-const updateCheckIntervalMs = 6 * 60 * 60 * 1000;
 
 export function App() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
@@ -24,7 +23,6 @@ export function App() {
   const [page, setPage] = useState("dashboard");
   const [profileOpen, setProfileOpen] = useState(false);
   const [appearance, setAppearance] = useState<AppearancePreference>(() => getAppearancePreference());
-  const updateCheckInFlight = useRef(false);
 
   async function refresh() {
     const nextHealth = await api.health();
@@ -60,45 +58,6 @@ export function App() {
     return () => window.clearInterval(interval);
   }, [health?.authenticated]);
 
-  useEffect(() => {
-    if (!health?.authenticated) return;
-
-    async function checkForUpdatesIfReady() {
-      if (updateCheckInFlight.current) return;
-      updateCheckInFlight.current = true;
-      try {
-        const [settings, currentHealth] = await Promise.all([
-          api.getUpdateSettings(),
-          api.health()
-        ]);
-        setHealth(currentHealth);
-        if (!updateSettingsReady(settings) || !updateCheckDue(currentHealth)) return;
-        setHealth({
-          ...currentHealth,
-          update: {
-            ...currentHealth.update,
-            status: "checking",
-            progress: { label: "Checking for updates", percent: 35 }
-          }
-        });
-        await api.update("check");
-        setHealth(await api.health());
-      } catch {
-        await api.health().then(setHealth).catch(() => {
-          // Keep the last known footer/update state if the check overlaps an API restart.
-        });
-      } finally {
-        updateCheckInFlight.current = false;
-      }
-    }
-
-    void checkForUpdatesIfReady();
-    const interval = window.setInterval(() => {
-      void checkForUpdatesIfReady();
-    }, updateCheckIntervalMs);
-    return () => window.clearInterval(interval);
-  }, [health?.authenticated]);
-
   if (!health) return <main className="loading">Loading Home Assistant AI...</main>;
 
   if (!health.setupComplete || !health.authenticated) {
@@ -128,19 +87,4 @@ export function App() {
       ) : null}
     </Layout>
   );
-}
-
-function updateSettingsReady(settings: UpdateSettings): boolean {
-  if (settings.source === "github") {
-    return Boolean(settings.githubOwner && settings.githubRepo);
-  }
-  return Boolean(settings.manifestUrl);
-}
-
-function updateCheckDue(health: SystemHealth): boolean {
-  if (health.update.status === "applying" || health.update.status === "checking") return false;
-  if (!health.update.checkedAt) return true;
-  const checkedAt = new Date(health.update.checkedAt).getTime();
-  if (Number.isNaN(checkedAt)) return true;
-  return Date.now() - checkedAt >= updateCheckIntervalMs;
 }
