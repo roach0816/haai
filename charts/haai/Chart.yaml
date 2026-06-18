@@ -2,8 +2,8 @@ apiVersion: v2
 name: haai
 description: Home Assistant AI read-only automation advisor
 type: application
-version: 0.0.45
-appVersion: "0.0.45"
+version: 1.0.0
+appVersion: "1.0.0"
 keywords:
   - home-assistant
   - automation

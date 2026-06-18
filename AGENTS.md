@@ -4,6 +4,8 @@
 
 Whenever the user asks Codex to commit, push, publish, tag, or prepare a release for this repository, increment the application version before the commit/push unless the user explicitly says not to.
 
+Do not publish the repository publicly during normal pre-release work. The user will explicitly say when they are ready for the public release. When that happens, prepare the public release as version `1.0.0`, not another `0.0.x` patch release, unless the user explicitly overrides that instruction.
+
 Ask the user which version bump to apply if it is not already clear:
 
 - Pre-release / early iteration: patch bump, for example `0.0.1` -> `0.0.2`.

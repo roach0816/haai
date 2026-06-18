@@ -275,12 +275,16 @@ export function Settings() {
     }
   }
 
+  const isContainerDeployment = health?.deployment.mode === "container";
+  const isApplianceDeployment = health?.deployment.mode === "appliance";
+  const canCheckUpdates = isApplianceDeployment || (isContainerDeployment && updateSettingsReady(update));
+
   return (
     <main>
       <section className="page-header">
         <div>
           <p className="eyebrow">Settings</p>
-          <h1>Connections and appliance controls</h1>
+          <h1>Connections and deployment controls</h1>
           <p className="muted">Secrets are encrypted locally. Home Assistant access remains read-only in v1.</p>
         </div>
       </section>
@@ -333,8 +337,8 @@ export function Settings() {
 
         <section className="panel">
           <div className="panel-heading">
-            <h2>Appliance</h2>
-            <span className="status-badge neutral">Local service</span>
+            <h2>System</h2>
+            <span className="status-badge neutral">{deploymentLabel(health)}</span>
           </div>
           <p>Version: {health?.version ?? "unknown"}</p>
           <p>Database: {health?.databasePath ?? "unknown"}</p>
@@ -350,128 +354,140 @@ export function Settings() {
           </p>
         </section>
 
-        <form className="panel" onSubmit={saveRuntime}>
-          <div className="panel-heading">
-            <h2>Network & TLS</h2>
-            <TlsBadge runtime={runtime} />
-          </div>
-          <p className="muted">
-            Port 8787 is the unprivileged default. Use 80/443 on the Pi, or map container ports externally.
-          </p>
-          <div className="two-col">
-            <label>
-              HTTP port
-              <input
-                type="number"
-                min={1}
-                max={65535}
-                value={runtime.httpPort}
-                onChange={(event) => setRuntime({ ...runtime, httpPort: Number(event.target.value) })}
-              />
-            </label>
-            <label>
-              HTTPS port
-              <input
-                type="number"
-                min={1}
-                max={65535}
-                value={runtime.httpsPort}
-                onChange={(event) => setRuntime({ ...runtime, httpsPort: Number(event.target.value) })}
-              />
-            </label>
-          </div>
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={runtime.httpsEnabled}
-              onChange={(event) => setRuntime({ ...runtime, httpsEnabled: event.target.checked })}
-            />
-            Serve the app with HTTPS when a certificate is ready
-          </label>
-          <div className="field-group">
-            <h3>SSL certificate</h3>
-            <label>
-              Hostname
-              <input
-                placeholder="haai.example.com"
-                value={runtime.ssl.hostname}
-                onChange={(event) =>
-                  setRuntime({ ...runtime, ssl: { ...runtime.ssl, hostname: event.target.value } })
-                }
-              />
-            </label>
-            <label>
-              DNS provider
-              <select
-                value={runtime.ssl.dnsProvider}
-                onChange={(event) =>
-                  setRuntime({
-                    ...runtime,
-                    ssl: { ...runtime.ssl, dnsProvider: event.target.value as RuntimeSettings["ssl"]["dnsProvider"] }
-                  })
-                }
-              >
-                <option value="cloudflare">Cloudflare</option>
-              </select>
-            </label>
-            <label>
-              Token {runtime.ssl.dnsTokenConfigured ? "(configured)" : ""}
-              <input
-                type="password"
-                value={cloudflareToken}
-                onChange={(event) => setCloudflareToken(event.target.value)}
-                placeholder={runtime.ssl.dnsTokenConfigured ? "Leave blank to keep existing token" : "Paste Cloudflare token"}
-              />
-            </label>
-            <div className="cert-status">
-              <span>Status: {formatCertStatus(runtime.ssl.status)}</span>
-              {runtime.ssl.requestedAt ? <span>Started: {new Date(runtime.ssl.requestedAt).toLocaleString()}</span> : null}
-              {runtime.ssl.expiresAt ? <span>Expires: {new Date(runtime.ssl.expiresAt).toLocaleDateString()}</span> : null}
+        {isContainerDeployment ? (
+          <ContainerNetworkPanel health={health} runtime={runtime} />
+        ) : isApplianceDeployment ? (
+          <form className="panel" onSubmit={saveRuntime}>
+            <div className="panel-heading">
+              <h2>Network & TLS</h2>
+              <TlsBadge runtime={runtime} />
             </div>
-            {runtime.ssl.error ? <p className="error">{runtime.ssl.error}</p> : null}
-          </div>
-          {runtime.restartRequired ? (
-            <p className="muted">A service restart is required before saved listener changes take effect.</p>
-          ) : null}
-          {runtime.ssl.status === "requesting" ? (
-            <p className="muted">Do not restart the service while certificate validation is running.</p>
-          ) : null}
-          <div className="button-row">
-            <button>Save network settings</button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={requestCertificate}
-              disabled={certificateRequesting || runtime.ssl.status === "requesting" || !runtime.ssl.hostname}
-            >
-              {certificateRequesting ? "Requesting..." : "Request certificate"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={resetCertificate}
-              disabled={!["requesting", "failed"].includes(runtime.ssl.status)}
-            >
-              Reset certificate status
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={renewCertificate}
-              disabled={certificateRequesting || runtime.ssl.status !== "ready"}
-            >
-              Renew certificate now
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={restartService}
-              disabled={restarting || runtime.ssl.status === "requesting"}
-            >
-              {restarting ? "Restarting..." : "Restart service"}
-            </button>
-          </div>
-        </form>
+            <p className="muted">
+              Port 8787 is the unprivileged default. Use 80/443 on the Pi, or map container ports externally.
+            </p>
+            <div className="two-col">
+              <label>
+                HTTP port
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={runtime.httpPort}
+                  onChange={(event) => setRuntime({ ...runtime, httpPort: Number(event.target.value) })}
+                />
+              </label>
+              <label>
+                HTTPS port
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={runtime.httpsPort}
+                  onChange={(event) => setRuntime({ ...runtime, httpsPort: Number(event.target.value) })}
+                />
+              </label>
+            </div>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={runtime.httpsEnabled}
+                onChange={(event) => setRuntime({ ...runtime, httpsEnabled: event.target.checked })}
+              />
+              Serve the app with HTTPS when a certificate is ready
+            </label>
+            <div className="field-group">
+              <h3>SSL certificate</h3>
+              <label>
+                Hostname
+                <input
+                  placeholder="haai.example.com"
+                  value={runtime.ssl.hostname}
+                  onChange={(event) =>
+                    setRuntime({ ...runtime, ssl: { ...runtime.ssl, hostname: event.target.value } })
+                  }
+                />
+              </label>
+              <label>
+                DNS provider
+                <select
+                  value={runtime.ssl.dnsProvider}
+                  onChange={(event) =>
+                    setRuntime({
+                      ...runtime,
+                      ssl: { ...runtime.ssl, dnsProvider: event.target.value as RuntimeSettings["ssl"]["dnsProvider"] }
+                    })
+                  }
+                >
+                  <option value="cloudflare">Cloudflare</option>
+                </select>
+              </label>
+              <label>
+                Token {runtime.ssl.dnsTokenConfigured ? "(configured)" : ""}
+                <input
+                  type="password"
+                  value={cloudflareToken}
+                  onChange={(event) => setCloudflareToken(event.target.value)}
+                  placeholder={runtime.ssl.dnsTokenConfigured ? "Leave blank to keep existing token" : "Paste Cloudflare token"}
+                />
+              </label>
+              <div className="cert-status">
+                <span>Status: {formatCertStatus(runtime.ssl.status)}</span>
+                {runtime.ssl.requestedAt ? <span>Started: {new Date(runtime.ssl.requestedAt).toLocaleString()}</span> : null}
+                {runtime.ssl.expiresAt ? <span>Expires: {new Date(runtime.ssl.expiresAt).toLocaleDateString()}</span> : null}
+              </div>
+              {runtime.ssl.error ? <p className="error">{runtime.ssl.error}</p> : null}
+            </div>
+            {runtime.restartRequired ? (
+              <p className="muted">A service restart is required before saved listener changes take effect.</p>
+            ) : null}
+            {runtime.ssl.status === "requesting" ? (
+              <p className="muted">Do not restart the service while certificate validation is running.</p>
+            ) : null}
+            <div className="button-row">
+              <button>Save network settings</button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={requestCertificate}
+                disabled={certificateRequesting || runtime.ssl.status === "requesting" || !runtime.ssl.hostname}
+              >
+                {certificateRequesting ? "Requesting..." : "Request certificate"}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={resetCertificate}
+                disabled={!["requesting", "failed"].includes(runtime.ssl.status)}
+              >
+                Reset certificate status
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={renewCertificate}
+                disabled={certificateRequesting || runtime.ssl.status !== "ready"}
+              >
+                Renew certificate now
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={restartService}
+                disabled={restarting || runtime.ssl.status === "requesting"}
+              >
+                {restarting ? "Restarting..." : "Restart service"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Network & TLS</h2>
+              <span className="status-badge neutral">Loading</span>
+            </div>
+            <p className="muted">Loading deployment controls...</p>
+          </section>
+        )}
 
         <section className="panel">
           <div className="panel-heading">
@@ -499,33 +515,30 @@ export function Settings() {
           <ReleaseNotes health={health} />
           <UpdateInstructions health={health} />
           <div className="button-row">
-            <button type="button" onClick={checkUpdate} disabled={updateChecking || updateApplying}>
-              {updateChecking ? "Checking..." : "Check for updates"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={applyUpdate}
-              disabled={
-                updateChecking ||
-                updateApplying ||
-                health?.update.status !== "available" ||
-                !health?.deployment.updateApplySupported
-              }
-            >
-              {health?.deployment.updateApplySupported
-                ? updateApplying
-                  ? "Applying..."
-                  : "Apply update"
-                : "Use deployment update"}
-            </button>
-            <button type="button" className="secondary" onClick={() => setUpdateSettingsOpen(true)}>
-              Update settings
-            </button>
+            {canCheckUpdates ? (
+              <button type="button" onClick={checkUpdate} disabled={updateChecking || updateApplying}>
+                {updateChecking ? "Checking..." : "Check for updates"}
+              </button>
+            ) : null}
+            {health?.deployment.updateApplySupported ? (
+              <button
+                type="button"
+                className="secondary"
+                onClick={applyUpdate}
+                disabled={updateChecking || updateApplying || health?.update.status !== "available"}
+              >
+                {updateApplying ? "Applying..." : "Apply update"}
+              </button>
+            ) : null}
+            {isApplianceDeployment ? (
+              <button type="button" className="secondary" onClick={() => setUpdateSettingsOpen(true)}>
+                Update settings
+              </button>
+            ) : null}
           </div>
         </section>
       </div>
-      {updateSettingsOpen ? (
+      {updateSettingsOpen && isApplianceDeployment ? (
         <UpdateSettingsModal
           update={update}
           githubToken={githubToken}
@@ -536,6 +549,52 @@ export function Settings() {
         />
       ) : null}
     </main>
+  );
+}
+
+function deploymentLabel(health: SystemHealth | null): string {
+  if (health?.deployment.mode === "container") return "Container";
+  if (health?.deployment.mode === "appliance") return "Appliance";
+  return "Local service";
+}
+
+function ContainerNetworkPanel({
+  health,
+  runtime
+}: {
+  health: SystemHealth | null;
+  runtime: RuntimeSettings;
+}) {
+  const listener = `${health?.network.protocol ?? "http"}://${health?.network.host ?? "0.0.0.0"}:${
+    health?.network.port ?? runtime.httpPort
+  }`;
+
+  return (
+    <section className="panel">
+      <div className="panel-heading">
+        <h2>Network & TLS</h2>
+        <span className="status-badge neutral">Platform managed</span>
+      </div>
+      <p className="muted">
+        This container listens inside the container. External ports, HTTPS, certificates, and restarts are managed by
+        Docker, Rancher/Kubernetes Ingress, a reverse proxy, load balancer, or Cloudflare Tunnel.
+      </p>
+      <div className="version-grid">
+        <div>
+          <span>Active listener</span>
+          <strong>{listener}</strong>
+        </div>
+        <div>
+          <span>Container port</span>
+          <strong>8787</strong>
+        </div>
+      </div>
+      <ol className="instruction-list">
+        <li>Map host ports in Docker or expose the Service through Kubernetes/Rancher.</li>
+        <li>Terminate HTTPS at your proxy, Ingress, Gateway, load balancer, or tunnel.</li>
+        <li>Restart or redeploy through the container platform rather than from inside HAAI.</li>
+      </ol>
+    </section>
   );
 }
 

@@ -8,6 +8,9 @@ ingress:
           pathType: Prefix
   tls: []
 
+config:
+  HAAI_TRUST_PROXY: "true"
+
 persistence:
   enabled: true
   size: 5Gi

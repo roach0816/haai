@@ -42,6 +42,7 @@ config:
   HAAI_RESTART_MODE: direct
   HAAI_DEPLOYMENT_MODE: container
   HAAI_UPDATE_APPLY_MODE: direct
+  HAAI_TRUST_PROXY: "false"
 
 existingSecret: ""
 secretMount:

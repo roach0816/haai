@@ -20,7 +20,7 @@ The Compose file uses a named volume mounted at `/data`. Do not remove that volu
 
 ## Private GHCR Images
 
-If the package is private, log in with a GitHub token that has `read:packages`:
+If you are using a private image or private fork, log in with a GitHub token that has `read:packages`:
 
 ```bash
 docker login ghcr.io
@@ -37,6 +37,12 @@ HAAI_HTTP_PORT=8080 docker compose up -d
 ```
 
 You can place any HTTP reverse proxy in front of HAAI. TLS normally terminates at the proxy, tunnel, load balancer, or gateway.
+
+When HAAI is behind a trusted reverse proxy, set:
+
+```bash
+HAAI_TRUST_PROXY=true docker compose up -d
+```
 
 ## Update
 

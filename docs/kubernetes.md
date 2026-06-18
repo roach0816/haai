@@ -29,7 +29,7 @@ Use your own Ingress controller, Gateway, certificate issuer, and DNS. A generic
 
 ## Secrets
 
-If the GHCR package is private, create an image-pull Secret and reference it with `image.pullSecrets`.
+If you are using a private image or private fork, create an image-pull Secret and reference it with `image.pullSecrets`.
 
 To provide a deterministic HAAI app secret, create a Kubernetes Secret with key `haai-secret` and set:
 
@@ -38,6 +38,8 @@ existingSecret: haai-secrets
 ```
 
 The chart mounts the Secret as a file and sets `HAAI_SECRET_FILE`.
+
+If HAAI is exposed through a trusted Ingress or Gateway, set `config.HAAI_TRUST_PROXY` to `"true"` in your Helm values.
 
 ## Replica Safety
 

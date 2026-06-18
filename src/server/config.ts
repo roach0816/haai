@@ -5,6 +5,7 @@ import path from "node:path";
 export interface RuntimeConfig {
   host: string;
   port: number;
+  trustProxy: boolean;
   protocol: "http" | "https";
   httpsEnabled: boolean;
   certPath: string;
@@ -39,6 +40,7 @@ export function getConfig(): RuntimeConfig {
   return {
     host: process.env.HAAI_HOST ?? "0.0.0.0",
     port,
+    trustProxy: parseBoolean(process.env.HAAI_TRUST_PROXY, false),
     protocol: httpsReady ? "https" : "http",
     httpsEnabled: httpsReady,
     certPath: runtime.certPath,
@@ -48,6 +50,11 @@ export function getConfig(): RuntimeConfig {
     secretPath: process.env.HAAI_SECRET_PATH ?? path.join(dataDir, "app-secret"),
     version: process.env.npm_package_version ?? readPackageVersion()
   };
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 export function readOptionalSecret(name: string): string | undefined {

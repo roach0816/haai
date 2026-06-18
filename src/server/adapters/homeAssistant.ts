@@ -378,7 +378,10 @@ function latest(a?: string, b?: string): string | undefined {
 }
 
 function redactConfig(config: Record<string, unknown>): Record<string, unknown> {
-  const { latitude: _lat, longitude: _lon, elevation: _elevation, ...rest } = config;
+  const rest = { ...config };
+  delete rest.latitude;
+  delete rest.longitude;
+  delete rest.elevation;
   return rest;
 }
 

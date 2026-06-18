@@ -31,7 +31,7 @@ LABEL org.opencontainers.image.title="Home Assistant AI" \
   org.opencontainers.image.source="${SOURCE}" \
   org.opencontainers.image.version="${VERSION}" \
   org.opencontainers.image.revision="${REVISION}" \
-  org.opencontainers.image.licenses="UNLICENSED"
+  org.opencontainers.image.licenses="MIT"
 
 ENV NODE_ENV=production \
   HAAI_HOST=0.0.0.0 \

@@ -1,4 +1,6 @@
 import cookie from "@fastify/cookie";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import fs from "node:fs";
@@ -14,15 +16,22 @@ import { systemRoutes } from "./routes/system.js";
 
 export async function buildApp() {
   const config = getConfig();
+  const fastifyOptions = { logger: true, trustProxy: config.trustProxy };
   const app = (config.httpsEnabled
     ? fastify<HttpsServer>({
-        logger: true,
+        ...fastifyOptions,
         https: {
           cert: fs.readFileSync(config.certPath),
           key: fs.readFileSync(config.keyPath)
         }
       })
-    : fastify({ logger: true })) as FastifyInstance;
+    : fastify(fastifyOptions)) as FastifyInstance;
+  await app.register(helmet, {
+    contentSecurityPolicy: false
+  });
+  await app.register(rateLimit, {
+    global: false
+  });
   await app.register(cookie);
   await app.register(authRoutes);
   await app.register(settingsRoutes);

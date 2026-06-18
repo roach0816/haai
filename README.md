@@ -50,8 +50,7 @@ The appliance target is Raspberry Pi OS Lite 64-bit on a Pi 4 or Pi 5.
 Prerequisites:
 
 - Raspberry Pi OS Lite 64-bit.
-- Git access to the HAAI repository or release source.
-- A GitHub token or deploy key if the repository is private.
+- Git.
 - A Home Assistant Long-Lived Access Token for first-run setup.
 
 ### Clone and install
@@ -66,7 +65,7 @@ cd /opt/haai
 sudo ./install.sh
 ```
 
-If the repository is private and Git asks for credentials, use your GitHub username and paste a token with repository read access as the password. A deploy key also works for SSH-based clones.
+If you are installing from a private fork or private release source, use a GitHub token or deploy key provided by that repository owner.
 
 The installer is intended to feel like a normal Linux application installer. It:
 
@@ -138,10 +137,10 @@ Create the local admin user, then go to Settings and configure:
   - DNS provider: `Cloudflare`.
   - Cloudflare token for Let's Encrypt DNS validation.
 - Appliance update source:
-  - Source: `Private GitHub release` if releases are private.
+  - Source: `GitHub release`.
   - GitHub owner: `roach0816`
   - GitHub repo: `haai`
-  - GitHub token: a token with release asset read access.
+  - GitHub token: only required when the release source is private.
 
 ## Docker Compose
 
@@ -213,6 +212,8 @@ This does not expose the HAAI web UI unless you explicitly create a tunnel route
 
 Use a Long-Lived Access Token from the Home Assistant profile page. This app is designed for read-only use in v1 and does not call Home Assistant write endpoints.
 
+Home Assistant Long-Lived Access Tokens can still carry broad account permissions. Treat the token like a sensitive credential, use the least-privileged Home Assistant account available, and rotate the token if you suspect exposure.
+
 Collected data is minimized before AI analysis:
 
 - latitude, longitude, elevation, GPS accuracy, IP, and MAC-like fields are removed where they commonly appear.
@@ -248,6 +249,14 @@ sudo /opt/haai/appliance/scripts/haai-update rollback
 
 For container deployments, use the Docker or Kubernetes image redeploy flow instead of the GUI Apply update button. The appliance updater is designed for the Raspberry Pi systemd install.
 
+## Security
+
+HAAI includes local username/password login, httpOnly SameSite cookies, rate limiting on sensitive auth routes, and standard HTTP security headers. For public or remote access, terminate TLS at a trusted reverse proxy, Cloudflare Tunnel, Kubernetes Ingress, Gateway, load balancer, or the Raspberry Pi appliance TLS listener.
+
+When HAAI is behind a trusted reverse proxy, set `HAAI_TRUST_PROXY=true` so client IP and protocol handling use forwarded headers. Session cookies automatically use the `Secure` flag for HTTPS requests or requests with `X-Forwarded-Proto: https`. You can override this with `HAAI_COOKIE_SECURE=true` or `HAAI_COOKIE_SECURE=false`.
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and deployment notes.
+
 If Network & TLS settings save but the active listener does not change, check for an old explicit port override:
 
 ```bash
@@ -280,3 +289,7 @@ npm start
 ```
 
 Maintainer release and versioning workflow is documented in `AGENTS.md`.
+
+## License
+
+HAAI is released under the [MIT License](LICENSE).
