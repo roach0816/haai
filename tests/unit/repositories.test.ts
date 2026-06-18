@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeDb } from "../../src/server/db/database.js";
+import { setSetting } from "../../src/server/db/database.js";
 import {
   addAppLog,
   createAnalysisRun,
@@ -59,6 +60,23 @@ describe("app log repository", () => {
 
 describe("update settings repository", () => {
   it("defaults to the public HAAI GitHub release source without requiring a token", () => {
+    expect(getUpdateSettings()).toMatchObject({
+      source: "github",
+      githubOwner: "roach0816",
+      githubRepo: "haai",
+      githubTokenConfigured: false
+    });
+  });
+
+  it("normalizes legacy blank GitHub settings to the public release source", () => {
+    setSetting("update", {
+      source: "github",
+      githubOwner: "",
+      githubRepo: "",
+      githubTokenConfigured: false,
+      manifestUrl: ""
+    });
+
     expect(getUpdateSettings()).toMatchObject({
       source: "github",
       githubOwner: "roach0816",

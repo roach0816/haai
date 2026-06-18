@@ -257,12 +257,27 @@ function normalizeMcpSettings(input?: Partial<AiSettings["mcp"]>): AiSettings["m
 }
 
 export function getUpdateSettings(includeToken = false) {
-  const stored = getSetting<typeof defaultUpdateSettings>("update", defaultUpdateSettings);
+  const stored = normalizeUpdateSettings(
+    getSetting<typeof defaultUpdateSettings>("update", defaultUpdateSettings)
+  );
   const githubToken = stored.githubToken ? decryptSecret(stored.githubToken) : "";
   return {
     ...stored,
     githubToken: includeToken ? githubToken : undefined,
     githubTokenConfigured: Boolean(stored.githubToken)
+  };
+}
+
+function normalizeUpdateSettings(
+  stored: Partial<typeof defaultUpdateSettings>
+): typeof defaultUpdateSettings {
+  return {
+    ...defaultUpdateSettings,
+    ...stored,
+    source: stored.source ?? defaultUpdateSettings.source,
+    githubOwner: (stored.githubOwner || defaultUpdateSettings.githubOwner).trim(),
+    githubRepo: (stored.githubRepo || defaultUpdateSettings.githubRepo).trim(),
+    manifestUrl: (stored.manifestUrl ?? "").trim()
   };
 }
 
