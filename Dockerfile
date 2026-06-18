@@ -37,7 +37,8 @@ ENV NODE_ENV=production \
   HAAI_HOST=0.0.0.0 \
   HAAI_PORT=8787 \
   HAAI_DATA_DIR=/data \
-  HAAI_RESTART_MODE=direct
+  HAAI_RESTART_MODE=direct \
+  HAAI_DEPLOYMENT_MODE=container
 
 WORKDIR /app
 

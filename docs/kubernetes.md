@@ -51,4 +51,6 @@ helm upgrade haai oci://ghcr.io/roach0816/charts/haai \
   --namespace haai
 ```
 
+The HAAI Settings > Updates card can check the configured release source and show the latest version, but Kubernetes deployments should apply updates by upgrading the Helm release in Rancher or Helm.
+
 Rollback uses Helm release history, but database migrations may not be reversible. Restore a matching PVC backup if a rollback crosses an incompatible migration.

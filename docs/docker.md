@@ -45,6 +45,8 @@ docker compose pull
 docker compose up -d --remove-orphans
 ```
 
+The HAAI Settings > Updates card can check the configured release source and show the latest version, but container deployments should apply updates with Docker Compose. The in-app appliance updater is only for Raspberry Pi systemd installs.
+
 Use immutable version tags for stable deployments. `latest` is convenient for testing but should not be the only production pin.
 
 ## Development Build

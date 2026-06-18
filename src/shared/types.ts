@@ -181,6 +181,10 @@ export interface SystemHealth {
     error?: string;
   };
   lastRun?: AnalysisRun;
+  deployment: {
+    mode: "appliance" | "container";
+    updateApplySupported: boolean;
+  };
   update: {
     currentVersion: string;
     availableVersion?: string;
@@ -190,6 +194,7 @@ export interface SystemHealth {
     releaseUrl?: string;
     releaseNotes?: string;
     archiveName?: string;
+    updateInstructions?: string[];
     progress?: {
       label: string;
       percent: number;

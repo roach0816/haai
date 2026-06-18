@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { getConfig } from "../config.js";
 import { getDb, nowIso } from "../db/database.js";
-import { addAppLog, findSessionUser, getRuntimeSettings, hasAdminUser, latestRun, listAppLogs } from "../db/repositories.js";
+import { addAppLog, findSessionUser, getRuntimeSettings, getUpdateSettings, hasAdminUser, latestRun, listAppLogs } from "../db/repositories.js";
 import { sessionCookieName, requireAuth } from "../auth.js";
 import { updaterConfigPath, writeUpdaterConfig } from "../services/updateConfig.js";
 import { writeRuntimeConfig } from "../services/runtimeConfig.js";
@@ -41,6 +41,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         error: runtime.ssl.error
       },
       lastRun: latestRun(),
+      deployment: deploymentInfo(),
       update: {
         currentVersion: String(updateRow.current_version),
         availableVersion: updateRow.available_version
@@ -52,6 +53,9 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         releaseUrl: updateRow.release_url ? String(updateRow.release_url) : undefined,
         releaseNotes: updateRow.release_notes ? String(updateRow.release_notes) : undefined,
         archiveName: updateRow.archive_name ? String(updateRow.archive_name) : undefined,
+        updateInstructions: updateRow.update_instructions
+          ? JSON.parse(String(updateRow.update_instructions))
+          : undefined,
         progress: updateRow.progress ? JSON.parse(String(updateRow.progress)) : undefined
       }
     };
@@ -75,6 +79,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
       addAppLog({ source: "updates", message: "Update check started" });
       try {
         const check = await runUpdaterCheck();
+        writeUpdaterStateFile(check);
         addAppLog({
           source: "updates",
           message: check.status === "available" ? "Update available" : "System is up to date",
@@ -110,6 +115,28 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     } else {
       addAppLog({ source: "updates", message: "Update apply requested" });
       try {
+        if (!deploymentInfo().updateApplySupported) {
+          const current = getUpdateState();
+          const checkedAt = nowIso();
+          const instructions = updateInstructions(String(current.available_version ?? ""));
+          writeUpdaterStateFile({
+            status: current.available_version ? "available" : "idle",
+            checkedAt,
+            currentVersion: String(current.current_version ?? getConfig().version),
+            availableVersion: current.available_version ? String(current.available_version) : undefined,
+            releaseUrl: current.release_url ? String(current.release_url) : undefined,
+            releaseNotes: current.release_notes ? String(current.release_notes) : undefined,
+            archiveName: current.archive_name ? String(current.archive_name) : undefined,
+            updateInstructions: instructions,
+            progress: current.progress ? JSON.parse(String(current.progress)) : undefined
+          });
+          addAppLog({
+            source: "updates",
+            message: "Container update apply skipped",
+            details: "Container deployments update by pulling a new image or upgrading the Helm chart."
+          });
+          return getUpdateState();
+        }
         markUpdateApplying();
         await triggerApplyUpdate();
         getDb()
@@ -146,6 +173,7 @@ interface UpdaterResult {
   releaseUrl?: string;
   releaseNotes?: string;
   archiveName?: string;
+  updateInstructions?: string[];
   progress?: { label: string; percent: number };
 }
 
@@ -166,6 +194,7 @@ function getUpdateState(): Record<string, unknown> {
       release_url: fileRow.releaseUrl,
       release_notes: fileRow.releaseNotes,
       archive_name: fileRow.archiveName,
+      update_instructions: fileRow.updateInstructions ? JSON.stringify(fileRow.updateInstructions) : undefined,
       progress: fileRow.progress ? JSON.stringify(fileRow.progress) : undefined
     };
   }
@@ -191,13 +220,25 @@ function markUpdateApplying(): void {
 }
 
 async function runUpdaterCheck(): Promise<UpdaterResult> {
-  const script = updaterScriptPath();
-  writeUpdaterConfig();
-  const { stdout } = await execFileAsync(script, ["check"], {
-    timeout: 30_000,
-    env: updaterEnv()
-  });
-  return JSON.parse(stdout) as UpdaterResult;
+  const release = await readReleaseMetadata();
+  const currentVersion = getConfig().version;
+  const updateAvailable = Boolean(
+    release.version && normalizeVersion(release.version) !== normalizeVersion(currentVersion)
+  );
+  return {
+    status: updateAvailable ? "available" : "idle",
+    checkedAt: nowIso(),
+    currentVersion,
+    availableVersion: release.version,
+    releaseUrl: release.releaseUrl,
+    releaseNotes: release.releaseNotes,
+    archiveName: release.archiveName,
+    updateInstructions: updateInstructions(release.version),
+    progress: {
+      label: updateAvailable ? "Update available" : "System is up to date",
+      percent: 100
+    }
+  };
 }
 
 async function triggerApplyUpdate(): Promise<void> {
@@ -221,6 +262,137 @@ function formatExecError(error: unknown): string {
     return [execError.message, execError.stderr, execError.stdout].filter(Boolean).join("\n");
   }
   return error instanceof Error ? error.message : "Update apply failed";
+}
+
+async function readReleaseMetadata(): Promise<{
+  version: string;
+  releaseUrl?: string;
+  releaseNotes?: string;
+  archiveName?: string;
+}> {
+  const settings = getUpdateSettings(true);
+  if (settings.source === "manifest") return readManifestMetadata(settings.manifestUrl);
+  return readGitHubReleaseMetadata(settings.githubOwner, settings.githubRepo, settings.githubToken ?? "");
+}
+
+async function readGitHubReleaseMetadata(owner: string, repo: string, token: string) {
+  if (!owner || !repo || !token) {
+    throw new Error("GitHub owner, repo, and token are required for update checks");
+  }
+
+  const response = await fetch(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases?per_page=30`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "haai-updater"
+      }
+    }
+  );
+  if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
+
+  const releases = await response.json();
+  if (!Array.isArray(releases)) throw new Error("GitHub releases response was not a list");
+
+  const release = selectGitHubRelease(releases);
+  if (!release) throw new Error("No published GitHub releases found for this repository");
+
+  const version = normalizeVersion(String(release.tag_name ?? release.name ?? ""));
+  const assets = Array.isArray(release.assets) ? release.assets : [];
+  const archiveAsset =
+    assets.find((asset) => String(asset.name ?? "") === `haai-${version}.tgz`) ??
+    assets.find((asset) => /^haai-.+\.tgz$/.test(String(asset.name ?? ""))) ??
+    assets.find((asset) => String(asset.name ?? "").endsWith(".tgz"));
+
+  return {
+    version,
+    releaseUrl: release.html_url ? String(release.html_url) : undefined,
+    releaseNotes: String(release.body ?? "").trim(),
+    archiveName: archiveAsset?.name ? String(archiveAsset.name) : undefined
+  };
+}
+
+async function readManifestMetadata(manifestUrl: string) {
+  if (!manifestUrl) throw new Error("Manifest URL is required for update checks");
+  const response = await fetch(manifestUrl, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`Update manifest returned ${response.status}`);
+  const manifest = (await response.json()) as Record<string, unknown>;
+  return {
+    version: normalizeVersion(String(manifest.version ?? "")),
+    releaseUrl: manifest.releaseUrl ? String(manifest.releaseUrl) : undefined,
+    releaseNotes: manifest.releaseNotes ? String(manifest.releaseNotes) : undefined,
+    archiveName: manifest.archiveName ? String(manifest.archiveName) : undefined
+  };
+}
+
+function selectGitHubRelease(releases: Array<Record<string, unknown>>) {
+  const published = releases.filter((release) => !release.draft);
+  const semverReleases = published
+    .map((release) => ({
+      release,
+      version: parseSemver(normalizeVersion(String(release.tag_name ?? "")))
+    }))
+    .filter(
+      (
+        item
+      ): item is {
+        release: Record<string, unknown>;
+        version: { major: number; minor: number; patch: number };
+      } => Boolean(item.version)
+    );
+  if (semverReleases.length) {
+    semverReleases.sort((left, right) => compareSemver(right.version, left.version));
+    return semverReleases[0].release;
+  }
+  return published[0];
+}
+
+function normalizeVersion(version: string): string {
+  return String(version).trim().replace(/^v/i, "");
+}
+
+function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
+  const match = String(version).match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3])
+  };
+}
+
+function compareSemver(
+  left: { major: number; minor: number; patch: number },
+  right: { major: number; minor: number; patch: number }
+): number {
+  return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
+}
+
+function deploymentInfo(): { mode: "appliance" | "container"; updateApplySupported: boolean } {
+  const explicitMode = process.env.HAAI_DEPLOYMENT_MODE;
+  const mode = explicitMode === "appliance" ? "appliance" : explicitMode === "container" ? "container" : inferDeploymentMode();
+  return {
+    mode,
+    updateApplySupported: mode === "appliance" && fs.existsSync(updaterScriptPath())
+  };
+}
+
+function inferDeploymentMode(): "appliance" | "container" {
+  if (getConfig().dataDir === "/data") return "container";
+  return fs.existsSync(updaterScriptPath()) ? "appliance" : "container";
+}
+
+function updateInstructions(version?: string): string[] {
+  if (deploymentInfo().mode === "appliance") return [];
+  const target = normalizeVersion(version ?? "");
+  const image = target ? `ghcr.io/roach0816/haai:${target}` : "ghcr.io/roach0816/haai:<version>";
+  return [
+    `Docker Compose: set the image tag to ${image}, then run docker compose pull && docker compose up -d --remove-orphans.`,
+    `Kubernetes/Rancher: upgrade the Helm release to chart version ${target || "<version>"} and image tag ${target || "<version>"}.`,
+    "Do not use the appliance Apply update action in containers. Keep /data persistent and let Docker or Kubernetes replace the running container."
+  ];
 }
 
 function updaterEnv(): NodeJS.ProcessEnv {

@@ -342,7 +342,12 @@ export function Settings() {
             Active listener: {health?.network.protocol ?? "http"}://{health?.network.host ?? "0.0.0.0"}:
             {health?.network.port ?? runtime.httpPort}
           </p>
-          <p className="muted">The API service is managed by systemd and stores local data on this Pi.</p>
+          <p>Deployment: {health?.deployment.mode ?? "unknown"}</p>
+          <p className="muted">
+            {health?.deployment.mode === "container"
+              ? "The app is running in a container. Updates should be applied by replacing the image or upgrading the Helm release."
+              : "The API service is managed by systemd and stores local data on this Pi."}
+          </p>
         </section>
 
         <form className="panel" onSubmit={saveRuntime}>
@@ -492,6 +497,7 @@ export function Settings() {
           {health?.update.error ? <p className="error">{health.update.error}</p> : null}
           <UpdateProgress health={health} checking={updateChecking} applying={updateApplying} />
           <ReleaseNotes health={health} />
+          <UpdateInstructions health={health} />
           <div className="button-row">
             <button type="button" onClick={checkUpdate} disabled={updateChecking || updateApplying}>
               {updateChecking ? "Checking..." : "Check for updates"}
@@ -500,9 +506,18 @@ export function Settings() {
               type="button"
               className="secondary"
               onClick={applyUpdate}
-              disabled={updateChecking || updateApplying || health?.update.status !== "available"}
+              disabled={
+                updateChecking ||
+                updateApplying ||
+                health?.update.status !== "available" ||
+                !health?.deployment.updateApplySupported
+              }
             >
-              {updateApplying ? "Applying..." : "Apply update"}
+              {health?.deployment.updateApplySupported
+                ? updateApplying
+                  ? "Applying..."
+                  : "Apply update"
+                : "Use deployment update"}
             </button>
             <button type="button" className="secondary" onClick={() => setUpdateSettingsOpen(true)}>
               Update settings
@@ -651,6 +666,31 @@ function ReleaseNotes({ health }: { health: SystemHealth | null }) {
       <pre className="notes-box">
         {update.releaseNotes?.trim() || "No release notes were provided for this release."}
       </pre>
+    </section>
+  );
+}
+
+function UpdateInstructions({ health }: { health: SystemHealth | null }) {
+  if (health?.deployment.updateApplySupported) return null;
+  const instructions = health?.update.updateInstructions ?? [
+    "Docker Compose: update the image tag, then run docker compose pull && docker compose up -d --remove-orphans.",
+    "Kubernetes/Rancher: upgrade the Helm chart and image tag to the desired version.",
+    "Keep /data persistent so SQLite state, settings, secrets, certificates, logs, and history are retained."
+  ];
+
+  return (
+    <section className="release-notes">
+      <div className="panel-heading">
+        <h3>Container update instructions</h3>
+      </div>
+      <p className="muted">
+        This deployment cannot be updated from inside the app. Use your container platform to replace the running image.
+      </p>
+      <ol className="instruction-list">
+        {instructions.map((instruction) => (
+          <li key={instruction}>{instruction}</li>
+        ))}
+      </ol>
     </section>
   );
 }
