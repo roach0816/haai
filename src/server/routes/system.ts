@@ -391,7 +391,7 @@ function updateInstructions(version?: string): string[] {
   return [
     `Docker Compose: set the image tag to ${image}, then run docker compose pull && docker compose up -d --remove-orphans.`,
     `Kubernetes/Rancher: upgrade the Helm release to chart version ${target || "<version>"} and image tag ${target || "<version>"}.`,
-    "Do not use the appliance Apply update action in containers. Keep /data persistent and let Docker or Kubernetes replace the running container."
+    "Keep /data persistent so SQLite state, settings, secrets, certificates, logs, and history remain attached after the container is replaced."
   ];
 }
 
