@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haai-fleet-values
+  namespace: haai
+data:
+  values.yaml: |
+    existingSecret: haai-secrets
+
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: haai.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: haai-tls
+          hosts:
+            - haai.example.com
+
+    persistence:
+      enabled: true
+      existingClaim: haai
+      storageClass: nfs-client
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+      mountPath: /data
+
+    config:
+      HAAI_TRUST_PROXY: "true"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi

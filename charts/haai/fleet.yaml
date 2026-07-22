@@ -4,6 +4,11 @@ namespace: haai
 helm:
   releaseName: haai
   timeoutSeconds: 600
+  valuesFrom:
+    - configMapKeyRef:
+        name: haai-fleet-values
+        namespace: haai
+        key: values.yaml
   values:
     image:
       repository: ghcr.io/roach0816/haai
