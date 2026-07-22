@@ -3,8 +3,6 @@ namespace: haai
 
 helm:
   releaseName: haai
-  chart: oci://ghcr.io/roach0816/charts/haai
-  version: 1.0.8
   timeoutSeconds: 600
   values:
     image:
