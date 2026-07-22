@@ -13,6 +13,7 @@ helm:
 
     persistence:
       enabled: true
+      existingClaim: haai
       size: 5Gi
       mountPath: /data
 
